@@ -85,7 +85,7 @@ class WhisperState: NSObject, ObservableObject {
     let parakeetModelsDirectory: URL
     let enhancementService: AIEnhancementService?
     var licenseViewModel: LicenseViewModel
-    let logger = Logger(subsystem: "com.sadiuysal.VoiceInk", category: "WhisperState")
+    let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "WhisperState")
     var notchWindowManager: NotchWindowManager?
     var miniWindowManager: MiniWindowManager?
     
@@ -95,8 +95,8 @@ class WhisperState: NSObject, ObservableObject {
     
     init(modelContext: ModelContext, enhancementService: AIEnhancementService? = nil) {
         self.modelContext = modelContext
-                    let appSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("com.sadiuysal.VoiceInk")
+        let appSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.prakashjoshipax.VoiceInk")
         
         self.modelsDirectory = appSupportDirectory.appendingPathComponent("WhisperModels")
         self.recordingsDirectory = appSupportDirectory.appendingPathComponent("Recordings")
@@ -273,9 +273,6 @@ class WhisperState: NSObject, ObservableObject {
             if await checkCancellationAndCleanup() { return }
             
             text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            // Filesystem context refresh (non-blocking)
-            FilesystemContextService.shared.refreshIfNeeded()
             
             if UserDefaults.standard.bool(forKey: "IsWordReplacementEnabled") {
                 text = WordReplacementService.shared.applyReplacements(to: text)

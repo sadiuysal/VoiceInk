@@ -8,9 +8,6 @@ extension UserDefaults {
         static let audioInputMode = "audioInputMode"
         static let selectedAudioDeviceUID = "selectedAudioDeviceUID"
         static let prioritizedDevices = "prioritizedDevices"
-        // Filesystem context
-        static let useFilesystemContext = "UseFilesystemContext"
-        static let manualProjectRootPath = "ManualProjectRootPath"
     }
     
     // MARK: - AI Provider API Key
@@ -47,16 +44,5 @@ extension UserDefaults {
     var prioritizedDevicesData: Data? {
         get { data(forKey: Keys.prioritizedDevices) }
         set { setValue(newValue, forKey: Keys.prioritizedDevices) }
-    }
-
-    // MARK: - Filesystem Context
-    var useFilesystemContext: Bool {
-        get { bool(forKey: Keys.useFilesystemContext) }
-        set { setValue(newValue, forKey: Keys.useFilesystemContext) }
-    }
-
-    var manualProjectRootPath: String? {
-        get { string(forKey: Keys.manualProjectRootPath) }
-        set { setValue(newValue, forKey: Keys.manualProjectRootPath) }
     }
 } 

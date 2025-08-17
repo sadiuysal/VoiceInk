@@ -154,8 +154,16 @@ class AIEnhancementService: ObservableObject {
             ""
         }
         
-        let contextSection = if !clipboardContext.isEmpty || !screenCaptureContext.isEmpty {
-            "\n\n<CONTEXT_INFORMATION>\(clipboardContext)\(screenCaptureContext)\n</CONTEXT_INFORMATION>"
+        let fsGlossaryContext: String = {
+            if UserDefaults.standard.bool(forKey: "UseFilesystemContext") {
+                let terms = FilesystemContextService.shared.currentGlossary(topK: 15)
+                if !terms.isEmpty { return "\n\nProject Terms: " + terms.joined(separator: ", ") }
+            }
+            return ""
+        }()
+        
+        let contextSection = if !clipboardContext.isEmpty || !screenCaptureContext.isEmpty || !fsGlossaryContext.isEmpty {
+            "\n\n<CONTEXT_INFORMATION>\(clipboardContext)\(screenCaptureContext)\(fsGlossaryContext)\n</CONTEXT_INFORMATION>"
         } else {
             ""
         }

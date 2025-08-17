@@ -8,7 +8,8 @@ class WordReplacementService {
     func applyReplacements(to text: String) -> String {
         guard let replacements = UserDefaults.standard.dictionary(forKey: "wordReplacements") as? [String: String],
               !replacements.isEmpty else {
-            return text // No replacements to apply
+            // Even if no explicit replacements, we may still apply fs glossary casing bias
+            return applyFilesystemGlossaryBias(to: text)
         }
         
         var modifiedText = text
@@ -34,6 +35,21 @@ class WordReplacementService {
             }
         }
         
+        return applyFilesystemGlossaryBias(to: modifiedText)
+    }
+
+    private func applyFilesystemGlossaryBias(to text: String) -> String {
+        guard UserDefaults.standard.bool(forKey: "UseFilesystemContext") else { return text }
+        let terms = Set(FilesystemContextService.shared.currentGlossary(topK: 50))
+        if terms.isEmpty { return text }
+        var modifiedText = text
+        for term in terms {
+            let escaped = NSRegularExpression.escapedPattern(for: term)
+            if let regex = try? NSRegularExpression(pattern: "(?i)\\b\(escaped)\\b") {
+                let range = NSRange(modifiedText.startIndex..., in: modifiedText)
+                modifiedText = regex.stringByReplacingMatches(in: modifiedText, options: [], range: range, withTemplate: term)
+            }
+        }
         return modifiedText
     }
 }

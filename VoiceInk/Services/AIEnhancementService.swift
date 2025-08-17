@@ -9,7 +9,7 @@ enum EnhancementPrompt {
 }
 
 class AIEnhancementService: ObservableObject {
-    private let logger = Logger(subsystem: "com.voiceink.enhancement", category: "AIEnhancementService")
+    private let logger = Logger(subsystem: "com.sadiuysal.VoiceInk", category: "AIEnhancementService")
     
     @Published var isEnhancementEnabled: Bool {
         didSet {
@@ -153,12 +153,21 @@ class AIEnhancementService: ObservableObject {
         } else {
             ""
         }
-        
-        let contextSection = if !clipboardContext.isEmpty || !screenCaptureContext.isEmpty {
-            "\n\n<CONTEXT_INFORMATION>\(clipboardContext)\(screenCaptureContext)\n</CONTEXT_INFORMATION>"
-        } else {
-            ""
-        }
+
+		 // Filesystem glossary context (optional, privacy-first)
+		 let fsGlossaryContext: String = {
+		     if UserDefaults.standard.bool(forKey: "UseFilesystemContext") {
+		         let terms = FilesystemContextService.shared.currentGlossary(topK: 15)
+		         if !terms.isEmpty { return "\n\nProject Terms: " + terms.joined(separator: ", ") }
+		     }
+		     return ""
+		 }()
+ 		 
+		 let contextSection = if !clipboardContext.isEmpty || !screenCaptureContext.isEmpty || !fsGlossaryContext.isEmpty {
+		     "\n\n<CONTEXT_INFORMATION>\(clipboardContext)\(screenCaptureContext)\(fsGlossaryContext)\n</CONTEXT_INFORMATION>"
+		 } else {
+		     ""
+		 }
         
         guard let activePrompt = activePrompt else {
             // Use default prompt when none is selected

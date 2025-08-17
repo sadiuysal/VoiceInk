@@ -32,7 +32,7 @@ struct VoiceInkApp: App {
             
             // Create app-specific Application Support directory URL
             let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("com.prakashjoshipax.VoiceInk", isDirectory: true)
+                .appendingPathComponent("com.sadiuysal.VoiceInk", isDirectory: true)
             
             // Create the directory if it doesn't exist
             try? FileManager.default.createDirectory(at: appSupportURL, withIntermediateDirectories: true)
@@ -97,6 +97,12 @@ struct VoiceInkApp: App {
                     .modelContainer(container)
                     .onAppear {
                         updaterViewModel.silentlyCheckForUpdates()
+                        
+                        // Opportunistically refresh filesystem glossary (non-blocking)
+                        if UserDefaults.standard.bool(forKey: "UseFilesystemContext") {
+                            FilesystemContextService.shared.refreshIfNeeded()
+                        }
+                        
                         AnnouncementsService.shared.start()
                         
                         // Start the transcription auto-cleanup service (handles immediate and scheduled transcript deletion)

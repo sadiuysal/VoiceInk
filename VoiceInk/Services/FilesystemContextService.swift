@@ -64,8 +64,8 @@ final class FilesystemContextService {
         }
         
         // Priority 2: Shell helper file (~/.voiceink/cwd)
-        if let cwdPath = (Constants.cwdHelperPath as NSString).expandingTildeInPath,
-           fileManager.fileExists(atPath: cwdPath),
+        let cwdPath = (Constants.cwdHelperPath as NSString).expandingTildeInPath
+        if fileManager.fileExists(atPath: cwdPath),
            let cwdContent = try? String(contentsOfFile: cwdPath),
            !cwdContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let url = URL(fileURLWithPath: cwdContent.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -124,7 +124,7 @@ final class FilesystemContextService {
             }
             
             // Score filenames
-            if allowedFilenames.contains { filename.uppercased().contains($0.uppercased()) } {
+            if allowedFilenames.contains(where: { filename.uppercased().contains($0.uppercased()) }) {
                 let cleanName = filename.replacingOccurrences(of: ".", with: " ")
                 let terms = tokenize(cleanName)
                 for term in terms {

@@ -30,7 +30,11 @@ struct VoiceInkApp: App {
                 Transcription.self,
                 IndexedDocument.self,
                 MarkdownSegment.self,
-                DictionaryProfile.self
+                DictionaryProfile.self,
+                Project.self,
+                ContextSource.self,
+                ContextPack.self,
+                DictionaryEntry.self
             ])
             
             // Create app-specific Application Support directory URL
@@ -85,6 +89,11 @@ struct VoiceInkApp: App {
         activeWindowService.configure(with: enhancementService)
         activeWindowService.configureWhisperState(whisperState)
         _activeWindowService = StateObject(wrappedValue: activeWindowService)
+        
+        // Configure ContextIndexStore with shared ModelContainer
+        Task { @MainActor in
+            ContextIndexStore.shared.configure(with: container)
+        }
     }
     
     var body: some Scene {

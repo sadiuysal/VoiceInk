@@ -15,49 +15,25 @@ final class ContextIndexStore: ObservableObject {
     @Published var isGitIngestSyncing = false
     @Published var lastGitIngestSyncAt: Date?
     
-    private var modelContainer: ModelContainer?
+    private var _modelContainer: ModelContainer?
     @MainActor
-    private var modelContext: ModelContext? {
-        modelContainer?.mainContext
+    var modelContext: ModelContext? {
+        _modelContainer?.mainContext
     }
     
     private init() {
-        setupModelContainer()
+        // Don't setup container here - will be configured by main app
     }
     
-    // MARK: - Model Container Setup
+    // MARK: - Configuration
     
-    private func setupModelContainer() {
-        do {
-            let schema = Schema([
-                IndexedDocument.self,
-                MarkdownSegment.self,
-                DictionaryProfile.self,
-                IndexedFile.self,
-                Project.self,
-                ContextSource.self,
-                ContextPack.self,
-                DictionaryEntry.self
-            ])
-            
-            let configuration = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: false,
-                allowsSave: true
-            )
-            
-            modelContainer = try ModelContainer(
-                for: schema,
-                configurations: [configuration]
-            )
-            
-            logger.info("ContextIndexStore initialized successfully")
-        } catch {
-            logger.error("Failed to initialize ContextIndexStore: \(error.localizedDescription)")
-        }
+    @MainActor
+    func configure(with container: ModelContainer) {
+        self._modelContainer = container
+        logger.info("ContextIndexStore configured with shared ModelContainer")
     }
     
-    // MARK: - Public API
+    // MARK: - Context Operations
     
     @MainActor
     func indexProject(at rootURL: URL) async {

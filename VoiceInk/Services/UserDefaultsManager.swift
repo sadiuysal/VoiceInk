@@ -11,6 +11,27 @@ extension UserDefaults {
         // Filesystem context
         static let useFilesystemContext = "UseFilesystemContext"
         static let manualProjectRootPath = "ManualProjectRootPath"
+        
+        // Chat Harvest Settings
+        static let autoCaptureChat = "AutoCaptureCursorChat"
+        static let chatLastMessages = "ChatHarvestLastMessages"
+        static let chatTokenCap = "ChatHarvestTokenCap"
+        static let chatCodeOnly = "ChatHarvestCodeOnly"
+        
+        // Project Context Settings
+        static let defaultProjectRoot = "DefaultProjectRoot"
+        static let autoDetectProject = "AutoDetectProjectContext"
+        static let ingestionFileSizeLimit = "IngestionFileSizeLimit"
+        
+        // Sync Settings
+        static let autoSyncInterval = "AutoSyncInterval"
+        static let backgroundSync = "BackgroundSyncEnabled"
+        static let maxConcurrentIngestions = "MaxConcurrentIngestions"
+        
+        // Advanced Settings
+        static let chatHarvestTimeout = "ChatHarvestTimeoutMs"
+        static let contextTokenBudget = "ContextTokenBudget"
+        static let enableFilesystemMonitoring = "EnableFilesystemMonitoring"
         static let enableContextInspector = "EnableContextInspector"
         static let fsRefreshTTLSeconds = "FSRefreshTTLSeconds"
         static let fsTermsLimit = "FSTermsLimit"
@@ -70,6 +91,109 @@ extension UserDefaults {
     var manualProjectRootPath: String? {
         get { string(forKey: Keys.manualProjectRootPath) }
         set { setValue(newValue, forKey: Keys.manualProjectRootPath) }
+    }
+    
+    // MARK: - Chat Harvest Settings
+    var autoCaptureChat: Bool {
+        get { 
+            // Default to true if key doesn't exist
+            if object(forKey: Keys.autoCaptureChat) == nil {
+                return true
+            }
+            return bool(forKey: Keys.autoCaptureChat) 
+        }
+        set { setValue(newValue, forKey: Keys.autoCaptureChat) }
+    }
+    
+    var chatLastMessages: Int {
+        get { 
+            let value = integer(forKey: Keys.chatLastMessages)
+            return value == 0 ? 8 : value // Default to 8 if not set
+        }
+        set { setValue(newValue, forKey: Keys.chatLastMessages) }
+    }
+    
+    var chatTokenCap: Int {
+        get { 
+            let value = integer(forKey: Keys.chatTokenCap)
+            return value == 0 ? 512 : value // Default to 512 if not set
+        }
+        set { setValue(newValue, forKey: Keys.chatTokenCap) }
+    }
+    
+    var chatCodeOnly: Bool {
+        get { bool(forKey: Keys.chatCodeOnly) }
+        set { setValue(newValue, forKey: Keys.chatCodeOnly) }
+    }
+    
+    // MARK: - Project Context Settings
+    var defaultProjectRoot: String? {
+        get { string(forKey: Keys.defaultProjectRoot) }
+        set { setValue(newValue, forKey: Keys.defaultProjectRoot) }
+    }
+    
+    var autoDetectProject: Bool {
+        get { 
+            if object(forKey: Keys.autoDetectProject) == nil {
+                return true
+            }
+            return bool(forKey: Keys.autoDetectProject) 
+        }
+        set { setValue(newValue, forKey: Keys.autoDetectProject) }
+    }
+    
+    var ingestionFileSizeLimit: Int {
+        get { 
+            let value = integer(forKey: Keys.ingestionFileSizeLimit)
+            return value == 0 ? 1_048_576 : value // Default to 1MB
+        }
+        set { setValue(newValue, forKey: Keys.ingestionFileSizeLimit) }
+    }
+    
+    // MARK: - Sync Settings
+    var autoSyncInterval: String {
+        get { string(forKey: Keys.autoSyncInterval) ?? "manual" }
+        set { setValue(newValue, forKey: Keys.autoSyncInterval) }
+    }
+    
+    var backgroundSync: Bool {
+        get { 
+            if object(forKey: Keys.backgroundSync) == nil {
+                return true
+            }
+            return bool(forKey: Keys.backgroundSync) 
+        }
+        set { setValue(newValue, forKey: Keys.backgroundSync) }
+    }
+    
+    var maxConcurrentIngestions: Int {
+        get { 
+            let value = integer(forKey: Keys.maxConcurrentIngestions)
+            return value == 0 ? 2 : value // Default to 2
+        }
+        set { setValue(newValue, forKey: Keys.maxConcurrentIngestions) }
+    }
+    
+    // MARK: - Advanced Settings
+    var chatHarvestTimeout: Int {
+        get { 
+            let value = integer(forKey: Keys.chatHarvestTimeout)
+            return value == 0 ? 150 : value // Default to 150ms
+        }
+        set { setValue(newValue, forKey: Keys.chatHarvestTimeout) }
+    }
+    
+    var contextTokenBudget: Int {
+        get { 
+            let value = integer(forKey: Keys.contextTokenBudget)
+            return value == 0 ? 2048 : value // Default to 2048
+        }
+        set { setValue(newValue, forKey: Keys.contextTokenBudget) }
+    }
+    
+    var enableFilesystemMonitoring: Bool {
+        get { bool(forKey: Keys.enableFilesystemMonitoring) }
+        set { setValue(newValue, forKey: Keys.enableFilesystemMonitoring) }
     }
 
     var enableContextInspector: Bool {

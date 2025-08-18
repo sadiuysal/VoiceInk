@@ -16,9 +16,10 @@ struct PowerModeConfig: Codable, Identifiable, Equatable {
     var isAutoSendEnabled: Bool = false
     var isEnabled: Bool = true
     var isDefault: Bool = false
+    var boundPackIds: [UUID] = [] // Context packs bound to this profile
         
     enum CodingKeys: String, CodingKey {
-        case id, name, emoji, appConfigs, urlConfigs, isAIEnhancementEnabled, selectedPrompt, selectedLanguage, useScreenCapture, selectedAIProvider, selectedAIModel, isAutoSendEnabled, isEnabled, isDefault
+        case id, name, emoji, appConfigs, urlConfigs, isAIEnhancementEnabled, selectedPrompt, selectedLanguage, useScreenCapture, selectedAIProvider, selectedAIModel, isAutoSendEnabled, isEnabled, isDefault, boundPackIds
         case selectedWhisperModel
         case selectedTranscriptionModelName
     }
@@ -87,6 +88,7 @@ struct PowerModeConfig: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(selectedTranscriptionModelName, forKey: .selectedTranscriptionModelName)
         try container.encode(isEnabled, forKey: .isEnabled)
         try container.encode(isDefault, forKey: .isDefault)
+        try container.encode(boundPackIds, forKey: .boundPackIds)
     }
     
     
@@ -304,5 +306,7 @@ class PowerModeManager: ObservableObject {
 
     func isEmojiInUse(_ emoji: String) -> Bool {
         return configurations.contains { $0.emoji == emoji }
+    }
+}  $0.emoji == emoji }
     }
 } 

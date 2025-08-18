@@ -33,7 +33,11 @@ final class ContextIndexStore: ObservableObject {
                 IndexedDocument.self,
                 MarkdownSegment.self,
                 DictionaryProfile.self,
-                IndexedFile.self
+                IndexedFile.self,
+                Project.self,
+                ContextSource.self,
+                ContextPack.self,
+                DictionaryEntry.self
             ])
             
             let configuration = ModelConfiguration(

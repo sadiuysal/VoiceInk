@@ -159,9 +159,11 @@ final class ContextBindingService: ObservableObject {
     // MARK: - Chat Harvest
     
     private func harvestChatIfApplicable() async -> ChatSnippet? {
-        // This will be implemented in Issue #7 - ChatHarvestService
-        // For now, return nil as placeholder
-        return nil
+        return await ChatHarvestService.shared.harvestLastMessagesIfCursorContext(
+            maxMessages: UserDefaults.standard.chatLastMessages,
+            tokenCap: UserDefaults.standard.chatTokenCap,
+            codeOnly: UserDefaults.standard.chatCodeOnly
+        )
     }
     
     // MARK: - Traditional Context Sources

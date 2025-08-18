@@ -10,6 +10,7 @@ enum ViewType: String, CaseIterable {
     case models = "AI Models"
     case enhancement = "Enhancement"
     case powerMode = "Power Mode"
+    case projects = "Projects"
     case permissions = "Permissions"
     case audioInput = "Audio Input"
     case dictionary = "Dictionary"
@@ -24,6 +25,7 @@ enum ViewType: String, CaseIterable {
         case .models: return "brain.head.profile"
         case .enhancement: return "wand.and.stars"
         case .powerMode: return "sparkles.square.fill.on.square"
+        case .projects: return "folder.badge.gearshape"
         case .permissions: return "shield.fill"
         case .audioInput: return "mic.fill"
         case .dictionary: return "character.book.closed.fill"
@@ -215,6 +217,9 @@ struct ContentView: View {
                 case "Enhancement":
                     print("ContentView: Navigating to Enhancement")
                     selectedView = .enhancement
+                case "Projects":
+                    print("ContentView: Navigating to Projects")
+                    selectedView = .projects
                 default:
                     print("ContentView: No matching destination found for: \(destination)")
                     break
@@ -249,6 +254,8 @@ struct ContentView: View {
             DictionarySettingsView(whisperPrompt: whisperState.whisperPrompt)
         case .powerMode:
             PowerModeView()
+        case .projects:
+            ProjectsView()
         case .settings:
             SettingsView()
                 .environmentObject(whisperState)

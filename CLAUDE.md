@@ -118,6 +118,112 @@ Privacy: reads only allowlisted files; no network; stored locally in Application
 
 ---
 
+## GitIngest Integration Architecture
+
+### Overview
+VoiceInk integrates with the [GitIngest](https://github.com/coderamp-labs/gitingest) open-source project to provide comprehensive repository-wide context analysis. This enhancement works alongside the existing Markdown Dictionary Index (MDI) system to deliver superior AI assistance for development workflows.
+
+### Core Integration Components
+
+#### GitInestService.swift
+- **Purpose**: Main service managing Python subprocess communication with GitIngest
+- **Key Features**:
+  - Manages bundled or system Python environment
+  - Handles configuration, timeouts, and error management  
+  - Provides async repository ingestion with progress tracking
+  - Supports both private (GitHub token) and public repositories
+
+#### GitIngestBridge.py
+- **Purpose**: JSON wrapper script providing clean API over GitIngest Python interface
+- **Features**:
+  - Supports both sync and async GitIngest operations
+  - Comprehensive error handling and configuration validation
+  - Structured JSON output for Swift integration
+  - Private repository support with GitHub Personal Access Tokens
+
+#### Python Environment Management
+- **Bundled Environment**: `VoiceInk/Resources/python-env/` with isolated GitIngest installation
+- **Setup Script**: `setup_gitingest.py` for automated environment creation
+- **Fallback**: System Python with runtime GitIngest availability checking
+
+### Hybrid Context Strategy
+
+#### Intelligent Sync Modes
+1. **Incremental Mode**: Existing file-level MDI updates (< 1 minute response)
+2. **Full Repository Mode**: GitIngest comprehensive analysis (scheduled/on-demand)
+3. **Hybrid Mode**: Smart combination based on change patterns and user settings
+
+#### Sync Triggers
+- **File-level changes**: Immediate incremental updates via FSEvents
+- **Repository-level changes**: GitIngest full sync when:
+  - New branches or significant commits detected
+  - Manual trigger from Power Mode UI
+  - Scheduled sync (configurable: 15min to 24 hours)
+  - Large batch changes (> 10 files modified)
+
+#### Content Merging
+```swift
+// Enhanced dictionary combines both approaches
+func createEnhancedDictionary() -> String {
+    let standardDictionary = createStandardDictionaryContent() // Existing MDI
+    let repoContextTerms = getRepoContextTerms() // GitIngest insights
+    return standardDictionary + repoContextTerms // Intelligent merge
+}
+```
+
+### Configuration Options
+
+#### User Settings (Settings → Project Context)
+- **Enable GitIngest Repository Analysis**: Master toggle
+- **Auto-sync Repository**: Automatic scheduled synchronization  
+- **Include Submodules**: Process Git submodules in analysis
+- **Include Gitignored Files**: Include files normally ignored by Git
+- **GitHub Token**: Personal Access Token for private repositories
+- **Sync Interval**: 15 minutes to 24 hours (default: 1 hour)
+
+#### UserDefaults Keys
+```swift
+// GitIngest Integration
+static let useGitIngest = "UseGitIngest"
+static let gitIngestTimeoutSeconds = "GitIngestTimeoutSeconds" // Default: 300
+static let gitIngestIncludeSubmodules = "GitIngestIncludeSubmodules"
+static let gitIngestIncludeGitignored = "GitIngestIncludeGitignored"
+static let gitIngestToken = "GitIngestToken" // Secure storage
+static let gitIngestAutoSync = "GitIngestAutoSync"
+static let gitIngestSyncInterval = "GitIngestSyncInterval" // Default: 3600 (1 hour)
+```
+
+### UI Integration
+
+#### Power Mode Context Panel
+- **Repository Status**: Shows GitIngest sync status and last sync time
+- **Quick Actions**:
+  - "Full Repository Sync": Manual trigger for comprehensive analysis
+  - "Copy Enhanced Repository Context": AI-optimized context for clipboard
+- **Progress Indicators**: Real-time sync progress and status display
+
+#### Enhanced Context Export
+- **Standard Context**: File-level MDI segments and filesystem terms
+- **Repository Context**: GitIngest-powered whole-repository insights
+- **Combined Export**: Intelligent merge prioritizing high-value content
+- **AI-Ready Format**: Structured for optimal Cursor/Claude Code integration
+
+### Privacy & Performance
+
+#### Privacy-First Design
+- **Local Processing**: Python environment bundled with application
+- **No External Dependencies**: GitIngest runs entirely offline
+- **Secure Token Storage**: GitHub tokens stored securely in Keychain
+- **User Control**: All features can be disabled; granular privacy controls
+
+#### Performance Optimization
+- **Configurable Timeouts**: Prevents hanging on large repositories (default: 5 minutes)
+- **Background Processing**: Non-blocking UI during repository analysis  
+- **Intelligent Caching**: Repository context cached locally for quick access
+- **Progressive Enhancement**: Existing workflows unaffected when disabled
+
+---
+
 ## Markdown Dictionary Index (MDI) System
 
 ### Overview
@@ -156,6 +262,179 @@ Durable anchor format: `md:path/file.md#section-slug:L15-23:hash4`
 - Enables precise cross-references between segments
 - Content hash ensures change detection
 - Section slug provides human-readable context
+
+#### Tag Generation System
+
+VoiceInk uses a sophisticated multi-layered tagging system to categorize and score markdown content segments. Tags are automatically generated during the indexing process in `MarkdownIndexer.swift`:
+
+**Source Tags** - File and directory context:
+```swift
+tags.append("markdown-file:\(relPath)")        // Source file identification
+tags.append("directory:\(lastDir)")            // Parent directory context
+```
+
+**Location Tags** - Precise positioning:
+```swift
+tags.append("lines:L\(startLine)-L\(endLine)") // Exact line boundaries  
+tags.append("section:\(sectionSlug)")          // Section hierarchy context
+```
+
+**Kind Tags** - Content classification:
+```swift
+tags.append("kind:\(segmentKind)")             // heading, code, list, etc.
+```
+
+**Semantic Tags** - Content analysis:
+```swift
+// File references
+if content.contains(".swift") { tags.append("file-ref:swift") }
+if content.contains(".md") { tags.append("file-ref:markdown") }
+if content.contains(".json") { tags.append("file-ref:config") }
+
+// Technical terminology patterns
+if content.matches("[A-Z][a-z]+(?:[A-Z][a-z]+)+") { tags.append("term:CamelCase") }
+if content.matches("[a-z]+-[a-z]+") { tags.append("term:kebab-case") }
+if content.matches("[a-z]+_[a-z]+") { tags.append("term:snake_case") }
+```
+
+**Priority Tags** - Importance weighting:
+```swift
+if relPath.contains("README") {
+    tags.append("prio:high")
+    tags.append("doc:readme")
+}
+if relPath.contains("CLAUDE") {
+    tags.append("prio:high") 
+    tags.append("doc:claude")
+}
+```
+
+**Scoring Algorithm**:
+```swift
+func calculateScore(for segment: MarkdownSegmentDraft, tags: [String]) -> Int {
+    var score = segment.kind.baseScore          // Base score by content type
+    
+    if tags.contains("prio:high") { score += 5 }         // High-priority files
+    if tags.hasPrefix("term:") { score += 2 }            // Technical terminology
+    if tags.hasPrefix("file-ref:") { score += 1 }        // File references
+    if segment.kind == .heading { score += 3 }           // Section headings
+    
+    // Content length optimization
+    let length = segment.content.count
+    if length > 100 && length < 1000 { score += 1 }      // Reasonable size bonus
+    
+    return max(1, score)
+}
+```
+
+**Segment Kind Base Scores**:
+- `heading`: 5 points (highest priority)
+- `code`: 4 points (technical content)  
+- `emphasis`: 3 points (highlighted text)
+- `list`: 2 points (structured content)
+- `quote`: 2 points (referenced material)
+- `paragraph`: 1 point (general content)
+
+This multi-dimensional tagging system enables precise content filtering, intelligent scoring, and context-aware dictionary generation for optimal AI assistance.
+
+---
+
+## VoiceInk Architecture Overview
+
+### Core Service Architecture
+
+VoiceInk follows a modular service-oriented architecture with clear separation of concerns:
+
+#### Primary Services Layer
+```
+┌─────────────────────────────────────────────────────┐
+│                   VoiceInk App                      │
+├─────────────────────────────────────────────────────┤
+│  Context Management    │  Transcription Services    │
+│  ├─ContextIndexStore   │  ├─LocalTranscriptionSvc  │
+│  ├─GitIngestService    │  ├─CloudTranscriptionSvc  │
+│  ├─MarkdownIndexer     │  ├─WhisperState            │
+│  ├─ProjectFileStore    │  └─TranscriptionFallback   │
+│  └─FilesystemContext   │                            │
+├─────────────────────────────────────────────────────┤
+│  AI Enhancement        │  Power Mode & Automation   │
+│  ├─AIEnhancementSvc    │  ├─PowerModeManager        │
+│  ├─PromptDetection     │  ├─ActiveWindowService     │
+│  ├─WordReplacement     │  ├─BrowserURLService       │
+│  └─ScreenCapture       │  └─AppPicker               │
+├─────────────────────────────────────────────────────┤
+│  System Integration    │  Data & Storage            │
+│  ├─MenuBarManager      │  ├─SwiftData Models        │
+│  ├─HotkeyManager       │  ├─UserDefaultsManager    │
+│  ├─NotificationMgr     │  ├─TranscriptionHistory   │
+│  └─AudioDeviceManager  │  └─ImportExportService    │
+└─────────────────────────────────────────────────────┘
+```
+
+#### Data Flow Architecture
+```
+User Input (Voice) → Audio Processing → Transcription → AI Enhancement → Context Integration → Output
+     ↓                    ↓                  ↓              ↓                   ↓               ↓
+[Microphone]        [WhisperState]    [LocalTranscription] [AIEnhancement]  [ContextStore]  [Clipboard]
+     ↓                    ↓                  ↓              ↓                   ↓               ↓
+[AudioDevice]       [CloudServices]   [TranscriptionSvc]   [PromptDetection] [GitIngest]    [PowerMode]
+     ↓                    ↓                  ↓              ↓                   ↓               ↓
+[HotkeyManager]     [ParakeetSvc]     [FallbackManager]    [WordReplacement] [MDI System]   [AppPicker]
+```
+
+#### Modular Component Design
+
+**Context Management Module**:
+- `ContextIndexStore`: SwiftData coordination and CRUD operations
+- `MarkdownIndexer`: Semantic parsing with quality filtering  
+- `GitIngestService`: Repository-wide analysis integration
+- `ProjectFileIndexStore`: File-level indexing with tagging
+- `FilesystemContextService`: Legacy term extraction + FSEvents
+
+**AI Enhancement Pipeline**:
+- `AIEnhancementService`: Main enhancement coordinator
+- `PromptDetectionService`: Context-aware prompt selection
+- `WordReplacementService`: Custom dictionary management
+- `ScreenCaptureService`: Visual context extraction
+
+**Transcription Stack**:
+- `WhisperState`: Local model management and inference
+- `TranscriptionService`: Service abstraction layer
+- `LocalTranscriptionService`: Whisper.cpp integration
+- `CloudTranscriptionService`: API-based transcription
+- `TranscriptionFallbackManager`: Reliability management
+
+**Power Mode System**:
+- `PowerModeManager`: Configuration and session management
+- `ActiveWindowService`: App detection and context switching
+- `BrowserURLService`: URL extraction and context
+- `AppPicker`: Application-specific configurations
+
+### Key Architectural Decisions
+
+#### SwiftData Integration
+- **Models**: Transcription, MarkdownSegment, IndexedDocument, DictionaryProfile
+- **Persistence**: Local SQLite with efficient indexing
+- **Threading**: MainActor isolation for UI consistency
+- **Migrations**: Version-safe schema evolution
+
+#### Concurrency Architecture
+- **MainActor**: UI and SwiftData operations
+- **Background Tasks**: File processing, transcription, indexing
+- **Actor Isolation**: Thread-safe service boundaries
+- **Async/Await**: Modern Swift concurrency throughout
+
+#### Plugin Architecture
+- **Transcription Models**: Pluggable model providers (Local, Cloud, Parakeet)
+- **Enhancement Services**: Modular AI enhancement pipeline  
+- **Context Sources**: Extensible context data sources
+- **Export Formats**: Flexible output format support
+
+#### Privacy-First Design Principles
+- **Local Processing**: All sensitive operations on-device
+- **User Control**: Granular privacy settings
+- **Secure Storage**: Keychain for sensitive data
+- **No Telemetry**: Zero data collection without explicit consent
 
 ### Context Window Manager
 

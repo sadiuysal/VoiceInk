@@ -4,6 +4,8 @@ import SwiftData
 enum ContextSourceType: String, Codable, CaseIterable {
     case gitIngest = "git_ingest"
     case manualNotes = "manual_notes"
+    case markdown = "markdown"
+    case documentation = "documentation"
     
     var displayName: String {
         switch self {
@@ -11,6 +13,10 @@ enum ContextSourceType: String, Codable, CaseIterable {
             return "Git Repository"
         case .manualNotes:
             return "Manual Notes"
+        case .markdown:
+            return "Markdown Files"
+        case .documentation:
+            return "Documentation"
         }
     }
     
@@ -20,6 +26,10 @@ enum ContextSourceType: String, Codable, CaseIterable {
             return "folder.badge.gearshape"
         case .manualNotes:
             return "note.text"
+        case .markdown:
+            return "doc.text"
+        case .documentation:
+            return "book"
         }
     }
 }
@@ -28,7 +38,9 @@ enum ContextSourceType: String, Codable, CaseIterable {
 final class ContextSource {
     @Attribute(.unique) var id: UUID
     var name: String
-    var type: ContextSourceType
+    var sourceDescription: String
+    var sourceType: ContextSourceType
+    var sourcePath: String?
     var configuration: Data // JSON encoded configuration specific to source type
     var createdAt: Date
     var lastSyncAt: Date?
@@ -41,19 +53,25 @@ final class ContextSource {
     init(
         id: UUID = UUID(),
         name: String,
-        type: ContextSourceType,
+        sourceDescription: String = "",
+        sourceType: ContextSourceType,
+        sourcePath: String? = nil,
         configuration: Data = Data(),
         project: Project? = nil,
         isEnabled: Bool = true
     ) {
         self.id = id
         self.name = name
-        self.type = type
+        self.sourceDescription = sourceDescription
+        self.sourceType = sourceType
+        self.sourcePath = sourcePath
         self.configuration = configuration
         self.project = project
-        self.createdAt = Date()
         self.isEnabled = isEnabled
+        self.createdAt = Date()
+        self.lastSyncAt = nil
         self.syncStatus = "idle"
+        self.errorMessage = nil
     }
     
     func updateSyncStatus(_ status: String, errorMessage: String? = nil) {

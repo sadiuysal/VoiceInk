@@ -85,7 +85,7 @@ class WhisperState: NSObject, ObservableObject {
     let parakeetModelsDirectory: URL
     let enhancementService: AIEnhancementService?
     var licenseViewModel: LicenseViewModel
-    let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "WhisperState")
+    let logger = Logger(subsystem: "com.sadiuysal.VoiceInk", category: "WhisperState")
     var notchWindowManager: NotchWindowManager?
     var miniWindowManager: MiniWindowManager?
     
@@ -96,7 +96,7 @@ class WhisperState: NSObject, ObservableObject {
     init(modelContext: ModelContext, enhancementService: AIEnhancementService? = nil) {
         self.modelContext = modelContext
         let appSupportDirectory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("com.prakashjoshipax.VoiceInk")
+            .appendingPathComponent("com.sadiuysal.VoiceInk")
         
         self.modelsDirectory = appSupportDirectory.appendingPathComponent("WhisperModels")
         self.recordingsDirectory = appSupportDirectory.appendingPathComponent("Recordings")
@@ -133,7 +133,7 @@ class WhisperState: NSObject, ObservableObject {
     
     func toggleRecord() async {
         if recordingState == .recording {
-            await recorder.stopRecording()
+            recorder.stopRecording()
             if let recordedFile {
                 if !shouldCancelRecording {
                     await transcribeAudio(recordedFile)
@@ -198,7 +198,7 @@ class WhisperState: NSObject, ObservableObject {
         
                         } catch {
                             self.logger.error("❌ Failed to start recording: \(error.localizedDescription)")
-                            await NotificationManager.shared.showNotification(title: "Recording failed to start", type: .error)
+                            NotificationManager.shared.showNotification(title: "Recording failed to start", type: .error)
                             await self.dismissMiniRecorder()
                             // Do not remove the file on a failed start, to preserve all recordings.
                             self.recordedFile = nil

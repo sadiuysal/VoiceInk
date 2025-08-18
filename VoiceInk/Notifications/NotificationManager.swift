@@ -59,7 +59,7 @@ class NotificationManager {
         
         positionWindow(panel)
         panel.alphaValue = 0
-        panel.makeKeyAndOrderFront(nil as Any?)
+        panel.orderFrontRegardless()
         
         self.notificationWindow = panel
         

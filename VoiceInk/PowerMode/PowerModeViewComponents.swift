@@ -295,6 +295,54 @@ struct ConfigurationRow: View {
                 .padding(.vertical, 10)
                 .padding(.horizontal, 16)
             }
+					if UserDefaults.standard.useFilesystemContext {
+						let root = FilesystemContextService.shared.detectActiveProjectRoot()
+						if let root, let cur = ProjectContextStore.shared.loadCurrent(for: root) {
+							HStack(spacing: 4) {
+								Image(systemName: "externaldrive.badge.icloud")
+									.font(.system(size: 10))
+								Text("FS Context ON")
+									.font(.caption)
+							}
+							.padding(.horizontal, 8)
+							.padding(.vertical, 4)
+							.background(Capsule().fill(Color(NSColor.controlBackgroundColor)))
+							.overlay(Capsule().stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
+							
+							HStack(spacing: 4) {
+								Image(systemName: "clock")
+									.font(.system(size: 10))
+								Text(RelativeDateTimeFormatter().localizedString(for: cur.createdAt, relativeTo: Date()))
+									.font(.caption)
+							}
+							.padding(.horizontal, 8)
+							.padding(.vertical, 4)
+							.background(Capsule().fill(Color(NSColor.controlBackgroundColor)))
+							.overlay(Capsule().stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
+							
+							HStack(spacing: 4) {
+								Image(systemName: "folder")
+									.font(.system(size: 10))
+								Text(root.lastPathComponent)
+									.font(.caption)
+							}
+							.padding(.horizontal, 8)
+							.padding(.vertical, 4)
+							.background(Capsule().fill(Color(NSColor.controlBackgroundColor)))
+							.overlay(Capsule().stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
+						} else {
+							HStack(spacing: 4) {
+								Image(systemName: "externaldrive")
+									.font(.system(size: 10))
+								Text("FS Context OFF")
+									.font(.caption)
+							}
+							.padding(.horizontal, 8)
+							.padding(.vertical, 4)
+							.background(Capsule().fill(Color(NSColor.controlBackgroundColor)))
+							.overlay(Capsule().stroke(Color(NSColor.separatorColor), lineWidth: 0.5))
+						}
+					}
     }
     .background(CardBackground(isSelected: isEditing))
     .opacity(config.isEnabled ? 1.0 : 0.5)

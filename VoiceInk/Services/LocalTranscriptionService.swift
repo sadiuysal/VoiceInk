@@ -5,7 +5,7 @@ import os
 class LocalTranscriptionService: TranscriptionService {
     
     private var whisperContext: WhisperContext?
-    private let logger = Logger(subsystem: "com.prakashjoshipax.voiceink", category: "LocalTranscriptionService")
+    private let logger = Logger(subsystem: "com.sadiuysal.VoiceInk", category: "LocalTranscriptionService")
     private let modelsDirectory: URL
     private weak var whisperState: WhisperState?
     
@@ -18,6 +18,10 @@ class LocalTranscriptionService: TranscriptionService {
         guard model.provider == .local else {
             throw WhisperStateError.modelLoadFailed
         }
+        #if !canImport(whisper)
+        logger.error("Local engine unavailable (whisper.xcframework missing); aborting local transcription.")
+        throw WhisperStateError.modelLoadFailed
+        #endif
         
         logger.notice("Initiating local transcription for model: \(model.displayName)")
         

@@ -27,7 +27,10 @@ struct VoiceInkApp: App {
     init() {
         do {
             let schema = Schema([
-                Transcription.self
+                Transcription.self,
+                IndexedDocument.self,
+                MarkdownSegment.self,
+                DictionaryProfile.self
             ])
             
             // Create app-specific Application Support directory URL

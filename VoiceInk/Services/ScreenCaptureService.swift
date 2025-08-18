@@ -8,7 +8,7 @@ class ScreenCaptureService: ObservableObject {
     @Published var lastCapturedText: String?
     
     private let logger = Logger(
-        subsystem: "com.prakashjoshipax.VoiceInk",
+        subsystem: "com.sadiuysal.VoiceInk",
         category: "aienhancement"
     )
     
@@ -148,34 +148,15 @@ class ScreenCaptureService: ObservableObject {
         
         logger.notice("🎯 Found window: \(windowInfo.title, privacy: .public) (\(windowInfo.ownerName, privacy: .public))")
         
-        // Start with window metadata
-        var contextText = """
+        // Metadata-only context (no OCR)
+        let contextText = """
         Active Window: \(windowInfo.title)
         Application: \(windowInfo.ownerName)
-        
         """
         
-        // Capture and process window content
-        if let capturedImage = captureActiveWindow() {
-            let extractedText = await withCheckedContinuation({ continuation in
-                extractText(from: capturedImage) { text in
-                    continuation.resume(returning: text)
-                }
-            })
-            
-            if let extractedText = extractedText {
-                contextText += "Window Content:\n\(extractedText)"
-                logger.notice("✅ Captured text successfully")
-                
-                await MainActor.run {
-                    self.lastCapturedText = contextText
-                }
-                
-                return contextText
-            }
+        await MainActor.run {
+            self.lastCapturedText = contextText
         }
-        
-        logger.notice("❌ Capture attempt failed")
-        return nil
+        return contextText
     }
 } 

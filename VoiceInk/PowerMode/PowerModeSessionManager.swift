@@ -126,7 +126,7 @@ class PowerModeSessionManager {
 
         if let whisperState = whisperState,
            let modelName = config.selectedTranscriptionModelName,
-           let selectedModel = await whisperState.allAvailableModels.first(where: { $0.name == modelName }),
+           let selectedModel = whisperState.allAvailableModels.first(where: { $0.name == modelName }),
            whisperState.currentTranscriptionModel?.name != modelName {
             await handleModelChange(to: selectedModel)
         }
@@ -161,7 +161,7 @@ class PowerModeSessionManager {
 
         if let whisperState = whisperState,
            let modelName = state.transcriptionModelName,
-           let selectedModel = await whisperState.allAvailableModels.first(where: { $0.name == modelName }),
+           let selectedModel = whisperState.allAvailableModels.first(where: { $0.name == modelName }),
            whisperState.currentTranscriptionModel?.name != modelName {
             await handleModelChange(to: selectedModel)
         }
@@ -170,12 +170,12 @@ class PowerModeSessionManager {
     private func handleModelChange(to newModel: any TranscriptionModel) async {
         guard let whisperState = whisperState else { return }
 
-        await whisperState.setDefaultTranscriptionModel(newModel)
+        whisperState.setDefaultTranscriptionModel(newModel)
 
         switch newModel.provider {
         case .local:
             await whisperState.cleanupModelResources()
-            if let localModel = await whisperState.availableModels.first(where: { $0.name == newModel.name }) {
+            if let localModel = whisperState.availableModels.first(where: { $0.name == newModel.name }) {
                 do {
                     try await whisperState.loadModel(localModel)
                 } catch {
@@ -191,7 +191,7 @@ class PowerModeSessionManager {
     }
     
     private func recoverSession() {
-        guard let session = loadSession() else { return }
+        guard loadSession() != nil else { return }
         print("Recovering abandoned Power Mode session.")
         Task {
             await endSession()

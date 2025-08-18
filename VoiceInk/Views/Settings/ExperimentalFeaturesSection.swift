@@ -41,6 +41,15 @@ struct ExperimentalFeaturesSection: View {
                 }
                 .toggleStyle(.switch)
                 .help("Automatically pause active media playback during recordings and resume afterward.")
+
+                Toggle(isOn: Binding(
+                    get: { UserDefaults.standard.enableContextInspector },
+                    set: { UserDefaults.standard.enableContextInspector = $0 }
+                )) {
+                    Text("Enable Context Inspector")
+                }
+                .toggleStyle(.switch)
+                .help("Show a debugging window with current project terms, source stats, and quick actions.")
             }
         }
         .padding(16)

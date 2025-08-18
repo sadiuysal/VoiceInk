@@ -201,6 +201,103 @@ struct SettingsView: View {
                 }
 
                 SettingsSection(
+                    icon: "folder",
+                    title: "Project Context",
+                    subtitle: "Basic configuration for context management"
+                ) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle("Enable Project Context", isOn: Binding(
+                            get: { UserDefaults.standard.useFilesystemContext },
+                            set: { UserDefaults.standard.useFilesystemContext = $0; FilesystemContextService.shared.refreshIfNeeded() }
+                        ))
+                        .toggleStyle(.switch)
+
+                        Toggle("Enable Incremental Updates (experimental)", isOn: Binding(
+                            get: { UserDefaults.standard.enableFSIncremental },
+                            set: { UserDefaults.standard.enableFSIncremental = $0; if $0 { FilesystemContextService.shared.startIncrementalWatchIfEnabled() } else { FilesystemContextService.shared.stopIncrementalWatch() } }
+                        ))
+                        .toggleStyle(.switch)
+                        
+                        Divider()
+                        
+                        // GitIngest Integration Settings
+                        VStack(alignment: .leading, spacing: 12) {
+                            Toggle("Enable GitIngest Repository Analysis", isOn: Binding(
+                                get: { UserDefaults.standard.useGitIngest },
+                                set: { UserDefaults.standard.useGitIngest = $0 }
+                            ))
+                            .toggleStyle(.switch)
+                            
+                            if UserDefaults.standard.useGitIngest {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Toggle("Auto-sync Repository", isOn: Binding(
+                                        get: { UserDefaults.standard.gitIngestAutoSync },
+                                        set: { UserDefaults.standard.gitIngestAutoSync = $0 }
+                                    ))
+                                    .toggleStyle(.switch)
+                                    
+                                    Toggle("Include Submodules", isOn: Binding(
+                                        get: { UserDefaults.standard.gitIngestIncludeSubmodules },
+                                        set: { UserDefaults.standard.gitIngestIncludeSubmodules = $0 }
+                                    ))
+                                    .toggleStyle(.switch)
+                                    
+                                    Toggle("Include Gitignored Files", isOn: Binding(
+                                        get: { UserDefaults.standard.gitIngestIncludeGitignored },
+                                        set: { UserDefaults.standard.gitIngestIncludeGitignored = $0 }
+                                    ))
+                                    .toggleStyle(.switch)
+                                    
+                                    HStack {
+                                        Text("GitHub Token (for private repos):")
+                                            .font(.system(size: 13, weight: .medium))
+                                        
+                                        Spacer()
+                                        
+                                        SecureField("ghp_...", text: Binding(
+                                            get: { UserDefaults.standard.gitIngestToken ?? "" },
+                                            set: { UserDefaults.standard.gitIngestToken = $0.isEmpty ? nil : $0 }
+                                        ))
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(maxWidth: 200)
+                                    }
+                                    
+                                    HStack {
+                                        Text("Sync Interval:")
+                                            .font(.system(size: 13, weight: .medium))
+                                        
+                                        Spacer()
+                                        
+                                        Picker("", selection: Binding(
+                                            get: { Int(UserDefaults.standard.gitIngestSyncInterval) },
+                                            set: { UserDefaults.standard.gitIngestSyncInterval = TimeInterval($0) }
+                                        )) {
+                                            Text("15 minutes").tag(900)
+                                            Text("1 hour").tag(3600)
+                                            Text("6 hours").tag(21600)
+                                            Text("24 hours").tag(86400)
+                                        }
+                                        .pickerStyle(.menu)
+                                        .frame(maxWidth: 120)
+                                    }
+                                    
+                                    Text("GitIngest provides comprehensive repository analysis for enhanced AI context.")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .padding(.leading, 16)
+                            }
+                        }
+
+						Text("For detailed repository management, use the Project Context panel in Power Mode.")
+							.settingsDescription()
+						Text("Local-only, privacy-first. Reads allowlisted files (README, markdown, manifests) and top-level filenames.")
+							.settingsDescription()
+                    }
+                }
+
+                SettingsSection(
                     icon: "lock.shield",
                     title: "Data & Privacy",
                     subtitle: "Control transcript history and storage"

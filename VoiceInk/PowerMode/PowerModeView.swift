@@ -120,7 +120,11 @@ struct PowerModeView: View {
                 
                 GeometryReader { geometry in
                     ScrollView {
-                        VStack(spacing: 0) {
+                        VStack(spacing: 20) {
+                            // Context Management Panel
+                            PowerModeContextPanel()
+                                .padding(.horizontal, 24)
+                            
                             if powerModeManager.configurations.isEmpty {
                                 VStack(spacing: 24) {
                                     Spacer()
@@ -149,20 +153,17 @@ struct PowerModeView: View {
                                 .frame(maxWidth: .infinity)
                                 .frame(minHeight: geometry.size.height)
                             } else {
-                                VStack(spacing: 0) {
-                                    PowerModeConfigurationsGrid(
-                                        powerModeManager: powerModeManager,
-                                        onEditConfig: { config in
-                                            configurationMode = .edit(config)
-                                            navigationPath.append(configurationMode!)
-                                        }
-                                    )
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 20)
-                                    
-                                    Spacer()
-                                        .frame(height: 40)
-                                }
+                                PowerModeConfigurationsGrid(
+                                    powerModeManager: powerModeManager,
+                                    onEditConfig: { config in
+                                        configurationMode = .edit(config)
+                                        navigationPath.append(configurationMode!)
+                                    }
+                                )
+                                .padding(.horizontal, 24)
+                                
+                                Spacer()
+                                    .frame(height: 40)
                             }
                         }
                     }

@@ -49,7 +49,7 @@ final class AnnouncementManager {
 
         position(panel)
         panel.alphaValue = 0
-        panel.makeKeyAndOrderFront(nil as Any?)
+        panel.orderFrontRegardless()
         self.panel = panel
 
         NSAnimationContext.runAnimationGroup { context in

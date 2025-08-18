@@ -1,7 +1,12 @@
 import SwiftUI
 
-extension String: Identifiable {
-    public var id: String { self }
+struct IdentifiableString: Identifiable {
+    let id = UUID()
+    let value: String
+    
+    init(_ value: String) {
+        self.value = value
+    }
 }
 
 class WordReplacementManager: ObservableObject {
@@ -44,7 +49,7 @@ struct WordReplacementView: View {
     @StateObject private var manager = WordReplacementManager()
     @State private var showAddReplacementModal = false
     @State private var showAlert = false
-    @State private var editingOriginal: String? = nil
+    @State private var editingOriginal: IdentifiableString? = nil
     
     @State private var alertMessage = ""
     
@@ -99,12 +104,13 @@ struct WordReplacementView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            ForEach(Array(manager.replacements.keys.sorted()), id: \.self) { original in
+                            ForEach(Array(manager.replacements.keys.sorted()).map(IdentifiableString.init)) { identifiableOriginal in
+                                let original = identifiableOriginal.value
                                 ReplacementRow(
                                     original: original,
                                     replacement: manager.replacements[original] ?? "",
                                     onDelete: { manager.removeReplacement(original: original) },
-                                    onEdit: { editingOriginal = original }
+                                    onEdit: { editingOriginal = IdentifiableString(original) }
                                 )
                                 
                                 if original != manager.replacements.keys.sorted().last {
@@ -123,8 +129,8 @@ struct WordReplacementView: View {
             AddReplacementSheet(manager: manager)
         }
         // Edit existing replacement
-        .sheet(item: $editingOriginal) { original in
-            EditReplacementSheet(manager: manager, originalKey: original)
+        .sheet(item: $editingOriginal) { identifiableOriginal in
+            EditReplacementSheet(manager: manager, originalKey: identifiableOriginal.value)
         }
         
     }

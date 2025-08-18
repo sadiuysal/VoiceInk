@@ -115,3 +115,276 @@ add-zsh-hook precmd _voiceink_publish_cwd
 ```
 
 Privacy: reads only allowlisted files; no network; stored locally in Application Support.
+
+---
+
+## Markdown Dictionary Index (MDI) System
+
+### Overview
+The Markdown Dictionary Index is a comprehensive system for analyzing, indexing, and managing project documentation to create intelligent, context-aware dictionaries for AI development workflows.
+
+### Core Architecture
+
+#### SwiftData Models
+- **IndexedDocument**: Represents a markdown file with metadata (path, hash, size, last indexed)
+- **MarkdownSegment**: Individual content segments with line-precise anchors and semantic tags
+- **DictionaryProfile**: Curated collections of pinned segments for specific project contexts
+- **SegmentKind**: Categorizes content (heading, code, list, quote, table, emphasis, paragraph)
+
+#### Key Services
+- **ContextIndexStore**: Main coordinator managing SwiftData persistence and CRUD operations
+- **MarkdownIndexer**: Parses markdown into semantic segments with quality filtering
+- **FilesystemContextService**: Legacy term extraction enhanced with MDI integration
+
+### Content Parsing & Segmentation
+
+#### Intelligent Parsing
+- Line-by-line markdown analysis with state machine approach
+- Automatic segment boundary detection (headings, code blocks, lists, quotes, tables)
+- Quality filtering removes low-value content (< 10 chars, insufficient meaningful words)
+- Preserves exact line numbers for precise references
+
+#### Semantic Tagging System
+Each segment receives multiple semantic tags:
+- **Source tags**: `markdown-file:path/to/file.md`, `directory:Services`
+- **Location tags**: `lines:L15-L23`, `section:implementation-details`
+- **Kind tags**: `kind:heading`, `kind:code-block`
+- **Content tags**: `term:CamelCase`, `file-ref:swift`, `prio:high`
+
+#### Anchor Generation
+Durable anchor format: `md:path/file.md#section-slug:L15-23:hash4`
+- Enables precise cross-references between segments
+- Content hash ensures change detection
+- Section slug provides human-readable context
+
+### Context Window Manager
+
+#### Multi-Tab Interface
+1. **Documents Tab**: Browse indexed markdown files with segment counts
+2. **Segments Tab**: Filter and search all segments by kind, content, score
+3. **Profiles Tab**: Manage curated dictionary collections
+4. **Legacy Tab**: Original filesystem context functionality
+
+#### Dictionary Profiles
+- Create project-specific term collections
+- Pin high-value segments for AI context
+- Generate markdown exports with tagged anchors
+- Push curated context to AI tools (Cursor integration)
+
+### Quality & Filtering Systems
+
+#### Stopword Filtering
+Comprehensive filter for 100+ common words ("the", "and", "for", etc.)
+Excludes version numbers, pure digits, and generic programming terms
+
+#### Scoring Algorithm
+- Base scores by segment kind (heading: 5, code: 4, emphasis: 3)
+- Priority boosts for README.md, CLAUDE.md content (+5)
+- Technical term detection bonuses (+2)
+- Content length optimization (100-1000 chars gets +1)
+
+#### Smart Term Limits
+- Flexible 50-1000 range based on content quality
+- Quality-first approach over arbitrary limits
+- Meaningful term extraction with semantic prefixes
+
+### File Reference Enhancement
+
+#### Semantic File Prefixes
+- `swift-file:AppDelegate.swift`
+- `markdown-file:README.md`
+- `config-file:package.json`
+- `directory:Services`
+
+#### Path Context Extraction
+Extracts meaningful references from content:
+- File paths with extensions
+- Directory structures
+- Relative and absolute path references
+- Case-sensitive filename preservation
+
+### Integration Points
+
+#### CLAUDE.md Synchronization
+- Special parsing for CLAUDE.md with 8x term weight multiplier
+- Skip self-generated sections to prevent feedback loops
+- Extract project-specific terminology and patterns
+- Sync updates with comment-based section markers
+
+#### Cursor Workflow Enhancement
+- "Push to Cursor" functionality copies curated context to clipboard
+- Anchor-based references for precise documentation links
+- Context-aware term suggestions for development
+
+### Performance & Storage
+
+#### Incremental Updates
+- File modification date tracking prevents unnecessary re-indexing
+- Optional FSEvents integration for real-time monitoring
+- Efficient SwiftData queries with proper indexing
+
+#### Storage Optimization
+- 1MB per-file size limits
+- 100-line segment boundaries
+- Content deduplication through hash-based tracking
+- Automatic cleanup of stale indices
+
+### User Experience
+
+#### Context Inspector Window
+- Dedicated window with proper lifecycle management
+- Real-time search and filtering across all indexed content
+- Copy-to-clipboard for anchor references
+- Visual feedback for operations (indexing progress, copy confirmations)
+
+#### Export Capabilities
+- Generate markdown dictionaries with tagged references
+- Save/load profile configurations
+- Export with file reveal in Finder
+- Automatic filename generation with timestamps
+
+### Technical Implementation
+
+#### Swift Concurrency
+- MainActor isolation for SwiftData operations
+- Async/await for file I/O operations  
+- Proper error handling and logging throughout
+- Thread-safe shared service instances
+
+#### Error Handling
+- Graceful degradation for oversized files
+- Comprehensive logging with subsystem organization
+- User feedback for failed operations
+- Fallback mechanisms for parse errors
+
+### Usage Scenarios
+
+#### AI Development Workflow
+1. Enable filesystem context in Settings
+2. Create dictionary profile for current project
+3. Browse and pin relevant documentation segments
+4. Export or push curated context to AI tools
+5. Reference specific sections with durable anchors
+
+#### Documentation Management
+1. Automatic indexing of all project markdown files
+2. Search across documentation by content or metadata
+3. Track documentation changes through hash monitoring
+4. Cross-reference related sections through tagging
+
+#### Code Context Enhancement
+1. File and directory reference extraction
+2. Technical term identification and weighting
+3. Case-sensitive naming preservation
+4. Integration with existing transcription workflows
+
+
+<!-- VOICEINK:TERMS:START -->
+# VoiceInk Project Context
+Generated: 18.8.2025, 4:43
+
+## Project Dictionary (100 terms)
+1. for
+2. the
+3. VoiceInk
+4. and
+5. build
+6. whisperxcframework
+7. with
+8. Screen
+9. Automation
+10. project
+11. Apple
+12. run
+13. Ensure
+14. targets
+15. Sign
+16. Embed
+17. Recording
+18. not
+19. Build
+20. app
+21. apple
+22. Content
+23. Xcode
+24. prompts
+25. cwd
+26. Embedded
+27. bash
+28. add
+29. Events
+30. whisper
+31. Frameworks
+32. signing
+33. enable
+34. from
+35. TCC
+36. required
+37. voiceink
+38. For
+39. XCFramework
+40. allow
+41. Application
+42. prompt
+43. microphone
+44. Privacy
+45. locally
+46. present
+47. whispercpp
+48. git
+49. Cursor
+50. Enable
+51. all
+52. Team
+53. Infoplist
+54. macOS
+55. settings
+56. distribution
+57. VoiceInkTests
+58. VoiceInkUITests
+59. shell
+60. into
+61. First
+62. Development
+63. Drag
+64. detection
+65. but
+66. UseFilesystemContext
+67. Applications
+68. image
+69. once
+70. key
+71. App
+72. true
+73. there
+74. when
+75. requires
+76. already
+77. listed
+78. appear
+79. defaults
+80. prompted
+81. sign
+82. notarytool
+83. Targets
+84. Target
+85. better
+86. denied
+87. Building
+88. Mic
+89. move
+90. Optional
+91. notarize
+92. dyld
+93. rebuild
+94. staple
+95. accept
+96. General
+97. publish
+98. Libraries
+99. building
+100. Note
+
+## Source Statistics
+- elapsedMs: 132
+<!-- VOICEINK:TERMS:END -->

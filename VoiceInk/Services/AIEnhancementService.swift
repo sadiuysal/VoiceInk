@@ -337,7 +337,7 @@ class AIEnhancementService: ObservableObject {
     func captureScreenContext() async {
         guard useScreenCaptureContext else { return }
         
-        if let capturedText = await screenCaptureService.captureAndExtractText() {
+        if let _ = await screenCaptureService.captureAndExtractText() {
             await MainActor.run {
                 self.objectWillChange.send()
             }

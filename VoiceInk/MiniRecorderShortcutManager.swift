@@ -77,7 +77,7 @@ class MiniRecorderShortcutManager: ObservableObject {
         KeyboardShortcuts.onKeyDown(for: .escapeRecorder) { [weak self] in
             Task { @MainActor in
                 guard let self = self,
-                      await self.whisperState.isMiniRecorderVisible else { return }
+                      self.whisperState.isMiniRecorderVisible else { return }
                 
                 // Don't process if custom shortcut is configured
                 guard KeyboardShortcuts.getShortcut(for: .cancelRecorder) == nil else { return }
@@ -121,7 +121,7 @@ class MiniRecorderShortcutManager: ObservableObject {
         KeyboardShortcuts.onKeyDown(for: .cancelRecorder) { [weak self] in
             Task { @MainActor in
                 guard let self = self,
-                      await self.whisperState.isMiniRecorderVisible,
+                      self.whisperState.isMiniRecorderVisible,
                       KeyboardShortcuts.getShortcut(for: .cancelRecorder) != nil else { return }
                 
                 SoundManager.shared.playEscSound()
@@ -141,6 +141,10 @@ class MiniRecorderShortcutManager: ObservableObject {
         escapeTimeoutTask = nil
     }
     
+    nonisolated private func deactivateEscapeShortcutNonisolated() {
+        KeyboardShortcuts.setShortcut(nil, for: .escapeRecorder)
+    }
+    
     private func deactivateCancelShortcut() {
         // Shortcut managed by user settings
     }
@@ -149,8 +153,8 @@ class MiniRecorderShortcutManager: ObservableObject {
         KeyboardShortcuts.onKeyDown(for: .toggleEnhancement) { [weak self] in
             Task { @MainActor in
                 guard let self = self,
-                      await self.whisperState.isMiniRecorderVisible,
-                      let enhancementService = await self.whisperState.getEnhancementService() else { return }
+                      self.whisperState.isMiniRecorderVisible,
+                      let enhancementService = self.whisperState.getEnhancementService() else { return }
                 enhancementService.isEnhancementEnabled.toggle()
             }
         }
@@ -183,7 +187,7 @@ class MiniRecorderShortcutManager: ObservableObject {
         KeyboardShortcuts.onKeyDown(for: shortcutName) { [weak self] in
             Task { @MainActor in
                 guard let self = self,
-                      await self.whisperState.isMiniRecorderVisible else { return }
+                      self.whisperState.isMiniRecorderVisible else { return }
                 
                 let powerModeManager = PowerModeManager.shared
                 
@@ -238,9 +242,9 @@ class MiniRecorderShortcutManager: ObservableObject {
         KeyboardShortcuts.onKeyDown(for: shortcutName) { [weak self] in
             Task { @MainActor in
                 guard let self = self,
-                      await self.whisperState.isMiniRecorderVisible else { return }
+                      self.whisperState.isMiniRecorderVisible else { return }
                 
-                guard let enhancementService = await self.whisperState.getEnhancementService() else { return }
+                guard let enhancementService = self.whisperState.getEnhancementService() else { return }
                 
                 let availablePrompts = enhancementService.allPrompts
                 if index < availablePrompts.count {
@@ -270,13 +274,28 @@ class MiniRecorderShortcutManager: ObservableObject {
         KeyboardShortcuts.setShortcut(nil, for: .toggleEnhancement)
     }
     
+    nonisolated private func removeEnhancementShortcutNonisolated() {
+        KeyboardShortcuts.setShortcut(nil, for: .toggleEnhancement)
+    }
+    
+    nonisolated private func removePowerModeShortcutsNonisolated() {
+        KeyboardShortcuts.setShortcut(nil, for: .selectPowerMode1)
+        KeyboardShortcuts.setShortcut(nil, for: .selectPowerMode2)
+        KeyboardShortcuts.setShortcut(nil, for: .selectPowerMode3)
+        KeyboardShortcuts.setShortcut(nil, for: .selectPowerMode4)
+        KeyboardShortcuts.setShortcut(nil, for: .selectPowerMode5)
+        KeyboardShortcuts.setShortcut(nil, for: .selectPowerMode6)
+        KeyboardShortcuts.setShortcut(nil, for: .selectPowerMode7)
+        KeyboardShortcuts.setShortcut(nil, for: .selectPowerMode8)
+        KeyboardShortcuts.setShortcut(nil, for: .selectPowerMode9)
+    }
+    
     deinit {
         visibilityTask?.cancel()
-        Task { @MainActor in
-            deactivateEscapeShortcut()
-            deactivateCancelShortcut()
-            removeEnhancementShortcut()
-            removePowerModeShortcuts()
-        }
+        // Clean up shortcuts synchronously in deinit using nonisolated methods
+        deactivateEscapeShortcutNonisolated()
+        // deactivateCancelShortcut is empty, skip
+        removeEnhancementShortcutNonisolated()
+        removePowerModeShortcutsNonisolated()
     }
 } 

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct ConfigurationView: View {
     let mode: ConfigurationMode
@@ -6,6 +7,8 @@ struct ConfigurationView: View {
     @EnvironmentObject var enhancementService: AIEnhancementService
     @EnvironmentObject var aiService: AIService
     @Environment(\.presentationMode) private var presentationMode
+    @Environment(\.modelContext) private var modelContext
+    @Query private var contextPacks: [ContextPack]
     @FocusState private var isNameFieldFocused: Bool
     
     // State for configuration
@@ -13,8 +16,6 @@ struct ConfigurationView: View {
     @State private var selectedEmoji: String = "💼"
     @State private var isShowingEmojiPicker = false
     @State private var isShowingAppPicker = false
-    @State private var isAIEnhancementEnabled: Bool
-    @State private var selectedPromptId: UUID?
     @State private var selectedTranscriptionModelName: String?
     @State private var selectedLanguage: String?
     @State private var installedApps: [(url: URL, name: String, bundleId: String, icon: NSImage)] = []
@@ -24,9 +25,8 @@ struct ConfigurationView: View {
     @State private var validationErrors: [PowerModeValidationError] = []
     @State private var showValidationAlert = false
     
-    // New state for AI provider and model
-    @State private var selectedAIProvider: String?
-    @State private var selectedAIModel: String?
+    // Context Pack binding state
+    @State private var selectedPackIds: Set<UUID> = []
     
     // App and Website configurations
     @State private var selectedAppConfigs: [AppConfig] = []
@@ -37,10 +37,6 @@ struct ConfigurationView: View {
     @State private var useScreenCapture = false
     @State private var isAutoSendEnabled = false
     @State private var isDefault = false
-    
-    // State for prompt editing (similar to EnhancementSettingsView)
-    @State private var isEditingPrompt = false
-    @State private var selectedPromptForEdit: CustomPrompt?
     
     // Whisper state for model selection
     @EnvironmentObject private var whisperState: WhisperState
@@ -78,8 +74,6 @@ struct ConfigurationView: View {
         // Always fetch the most current configuration data
         switch mode {
         case .add:
-            _isAIEnhancementEnabled = State(initialValue: true)
-            _selectedPromptId = State(initialValue: nil)
             _selectedTranscriptionModelName = State(initialValue: nil)
             _selectedLanguage = State(initialValue: nil)
             _configName = State(initialValue: "")
@@ -87,14 +81,10 @@ struct ConfigurationView: View {
             _useScreenCapture = State(initialValue: false)
             _isAutoSendEnabled = State(initialValue: false)
             _isDefault = State(initialValue: false)
-            // Default to current global AI provider/model for new configurations - use UserDefaults only
-            _selectedAIProvider = State(initialValue: UserDefaults.standard.string(forKey: "selectedAIProvider"))
-            _selectedAIModel = State(initialValue: nil) // Initialize to nil and set it after view appears
+            _selectedPackIds = State(initialValue: Set<UUID>())
         case .edit(let config):
             // Get the latest version of this config from PowerModeManager
             let latestConfig = powerModeManager.getConfiguration(with: config.id) ?? config
-            _isAIEnhancementEnabled = State(initialValue: latestConfig.isAIEnhancementEnabled)
-            _selectedPromptId = State(initialValue: latestConfig.selectedPrompt.flatMap { UUID(uuidString: $0) })
             _selectedTranscriptionModelName = State(initialValue: latestConfig.selectedTranscriptionModelName)
             _selectedLanguage = State(initialValue: latestConfig.selectedLanguage)
             _configName = State(initialValue: latestConfig.name)
@@ -104,8 +94,7 @@ struct ConfigurationView: View {
             _useScreenCapture = State(initialValue: latestConfig.useScreenCapture)
             _isAutoSendEnabled = State(initialValue: latestConfig.isAutoSendEnabled)
             _isDefault = State(initialValue: latestConfig.isDefault)
-            _selectedAIProvider = State(initialValue: latestConfig.selectedAIProvider)
-            _selectedAIModel = State(initialValue: latestConfig.selectedAIModel)
+            _selectedPackIds = State(initialValue: Set(latestConfig.boundPackIds))
         }
     }
     
@@ -422,154 +411,60 @@ struct ConfigurationView: View {
                     .padding(.horizontal)
                     
                     VStack(spacing: 16) {
-                        SectionHeader(title: "AI Enhancement")
+                        SectionHeader(title: "Context Packs")
 
-                        Toggle("Enable AI Enhancement", isOn: $isAIEnhancementEnabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .onChange(of: isAIEnhancementEnabled) { oldValue, newValue in
-                                if newValue {
-                                    if selectedAIProvider == nil {
-                                        selectedAIProvider = aiService.selectedProvider.rawValue
-                                    }
-                                    if selectedAIModel == nil {
-                                        selectedAIModel = aiService.currentModel
-                                    }
-                                }
-                            }
-
-                        Divider()
-                            
-                            let providerBinding = Binding<AIProvider>(
-                                get: {
-                                    if let providerName = selectedAIProvider,
-                                       let provider = AIProvider(rawValue: providerName) {
-                                        return provider
-                                    }
-                                    return aiService.selectedProvider
-                                },
-                                set: { newValue in
-                                    selectedAIProvider = newValue.rawValue
-                                    aiService.selectedProvider = newValue
-                                    selectedAIModel = nil
-                                }
-                            )
-                            
-                            
-                        
-                        
-                        if isAIEnhancementEnabled {
-                            
-                            HStack {
-                                Text("AI Provider")
-                                    .font(.subheadline)
+                        if contextPacks.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "archivebox")
+                                    .font(.system(size: 24))
                                     .foregroundColor(.secondary)
                                 
-                                if aiService.connectedProviders.isEmpty {
-                                    Text("No providers connected")
-                                        .foregroundColor(.secondary)
-                                        .italic()
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                } else {
-                                    Picker("", selection: providerBinding) {
-                                        ForEach(aiService.connectedProviders.filter { $0 != .elevenLabs && $0 != .deepgram }, id: \.self) { provider in
-                                            Text(provider.rawValue).tag(provider)
-                                        }
-                                    }
-                                    .labelsHidden()
-                                    .onChange(of: selectedAIProvider) { oldValue, newValue in
-                                        if let provider = newValue.flatMap({ AIProvider(rawValue: $0) }) {
-                                            selectedAIModel = provider.defaultModel
-                                        }
-                                    }
-                                    Spacer()
-                                }
-                            }
-                            
-                            let providerName = selectedAIProvider ?? aiService.selectedProvider.rawValue
-                            if let provider = AIProvider(rawValue: providerName),
-                               provider != .custom {
+                                Text("No Context Packs Available")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
                                 
-                                HStack {
-                                    Text("AI Model")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
-                                    
-                                    if aiService.availableModels.isEmpty {
-                                        Text(provider == .openRouter ? "No models loaded" : "No models available")
-                                            .foregroundColor(.secondary)
-                                            .italic()
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    } else {
-                                        let modelBinding = Binding<String>(
-                                            get: { 
-                                                if let model = selectedAIModel, !model.isEmpty {
-                                                    return model
-                                                }
-                                                return aiService.currentModel
-                                            },
-                                            set: { newModelValue in
-                                                selectedAIModel = newModelValue
-                                                aiService.selectModel(newModelValue)
-                                            }
+                                Text("Create context packs in the Projects section to make them available for this Power Mode profile.")
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 20)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                        } else {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Select context packs to include with this Power Mode profile. Selected packs will provide dictionary terms and project knowledge during transcription enhancement.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                LazyVGrid(columns: [
+                                    GridItem(.adaptive(minimum: 250, maximum: 300), spacing: 12)
+                                ], spacing: 12) {
+                                    ForEach(contextPacks.filter { $0.isActive }) { pack in
+                                        PowerModeContextPackCard(
+                                            pack: pack,
+                                            isSelected: selectedPackIds.contains(pack.id),
+                                            onToggle: { togglePack(pack) }
                                         )
-                                        
-                                        let models = provider == .openRouter ? aiService.availableModels : (provider == .ollama ? aiService.availableModels : provider.availableModels)
-                                        
-                                        Picker("", selection: modelBinding) {
-                                            ForEach(models, id: \.self) { model in
-                                                Text(model).tag(model)
-                                            }
-                                        }
-                                        .labelsHidden()
-                                        
-                                        if provider == .openRouter {
-                                            Button(action: {
-                                                Task {
-                                                    await aiService.fetchOpenRouterModels()
-                                                }
-                                            }) {
-                                                Image(systemName: "arrow.clockwise")
-                                            }
-                                            .buttonStyle(.borderless)
-                                            .help("Refresh models")
-                                        }
+                                    }
+                                }
+                                
+                                if !selectedPackIds.isEmpty {
+                                    HStack {
+                                        Text("\(selectedPackIds.count) pack\(selectedPackIds.count == 1 ? "" : "s") selected")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
                                         
                                         Spacer()
+                                        
+                                        Button("Clear Selection") {
+                                            selectedPackIds.removeAll()
+                                        }
+                                        .font(.caption)
                                     }
+                                    .padding(.top, 8)
                                 }
                             }
-                        
-                            
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("Enhancement Prompt")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                
-                                PromptSelectionGrid(
-                                    prompts: enhancementService.allPrompts,
-                                    selectedPromptId: selectedPromptId,
-                                    onPromptSelected: { prompt in
-                                        selectedPromptId = prompt.id
-                                    },
-                                    onEditPrompt: { prompt in
-                                        selectedPromptForEdit = prompt
-                                    },
-                                    onDeletePrompt: { prompt in
-                                        enhancementService.deletePrompt(prompt)
-                                    },
-                                    onAddNewPrompt: {
-                                        isEditingPrompt = true
-                                    }
-                                )
-                            }
-
-                            Divider()
-                            
-                           
-                            Toggle("Context Awareness", isOn: $useScreenCapture)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                
-                            
                         }
                     }
                     .padding()
@@ -613,30 +508,11 @@ struct ConfigurationView: View {
                 onDismiss: { isShowingAppPicker = false }
             )
         }
-        .sheet(isPresented: $isEditingPrompt) {
-            PromptEditorView(mode: .add)
-        }
-        .sheet(item: $selectedPromptForEdit) { prompt in
-            PromptEditorView(mode: .edit(prompt))
-        }
-        .powerModeValidationAlert(errors: validationErrors, isPresented: $showValidationAlert)
         .navigationTitle("") // Explicitly set an empty title for this view
         .toolbar(.hidden) // Attempt to hide the navigation bar area
         .onAppear {
-            // Set AI provider and model for new power modes after environment objects are available
-            if case .add = mode {
-                if selectedAIProvider == nil {
-                    selectedAIProvider = aiService.selectedProvider.rawValue
-                }
-                if selectedAIModel == nil || selectedAIModel?.isEmpty == true {
-                    selectedAIModel = aiService.currentModel
-                }
-            }
-            
-            // Select first prompt if AI enhancement is enabled and no prompt is selected
-            if isAIEnhancementEnabled && selectedPromptId == nil {
-                selectedPromptId = enhancementService.allPrompts.first?.id
-            }
+            // Load installed apps for app selection
+            loadInstalledApps()
         }
     }
     
@@ -665,36 +541,35 @@ struct ConfigurationView: View {
     private func getConfigForForm() -> PowerModeConfig {
         switch mode {
         case .add:
-                return PowerModeConfig(
+                var config = PowerModeConfig(
                 name: configName,
                 emoji: selectedEmoji,
                 appConfigs: selectedAppConfigs.isEmpty ? nil : selectedAppConfigs,
                 urlConfigs: websiteConfigs.isEmpty ? nil : websiteConfigs,
-                    isAIEnhancementEnabled: isAIEnhancementEnabled,
-                    selectedPrompt: selectedPromptId?.uuidString,
+                    isAIEnhancementEnabled: true, // Keep for backward compatibility, actual enhancement handled globally
+                    selectedPrompt: nil,
                     selectedTranscriptionModelName: selectedTranscriptionModelName,
                     selectedLanguage: selectedLanguage,
                     useScreenCapture: useScreenCapture,
-                    selectedAIProvider: selectedAIProvider,
-                    selectedAIModel: selectedAIModel,
+                    selectedAIProvider: nil,
+                    selectedAIModel: nil,
                     isAutoSendEnabled: isAutoSendEnabled,
                     isDefault: isDefault
                 )
+                config.boundPackIds = Array(selectedPackIds)
+                return config
         case .edit(let config):
             var updatedConfig = config
             updatedConfig.name = configName
             updatedConfig.emoji = selectedEmoji
-            updatedConfig.isAIEnhancementEnabled = isAIEnhancementEnabled
-            updatedConfig.selectedPrompt = selectedPromptId?.uuidString
             updatedConfig.selectedTranscriptionModelName = selectedTranscriptionModelName
             updatedConfig.selectedLanguage = selectedLanguage
             updatedConfig.appConfigs = selectedAppConfigs.isEmpty ? nil : selectedAppConfigs
             updatedConfig.urlConfigs = websiteConfigs.isEmpty ? nil : websiteConfigs
             updatedConfig.useScreenCapture = useScreenCapture
             updatedConfig.isAutoSendEnabled = isAutoSendEnabled
-            updatedConfig.selectedAIProvider = selectedAIProvider
-            updatedConfig.selectedAIModel = selectedAIModel
             updatedConfig.isDefault = isDefault
+            updatedConfig.boundPackIds = Array(selectedPackIds)
             return updatedConfig
         }
     }
@@ -789,5 +664,70 @@ struct ConfigurationView: View {
         }
         
         presentationMode.wrappedValue.dismiss()
+    }
+    
+    private func togglePack(_ pack: ContextPack) {
+        if selectedPackIds.contains(pack.id) {
+            selectedPackIds.remove(pack.id)
+        } else {
+            selectedPackIds.insert(pack.id)
+        }
+    }
+}
+
+// MARK: - PowerMode Context Pack Card
+struct PowerModeContextPackCard: View {
+    let pack: ContextPack
+    let isSelected: Bool
+    let onToggle: () -> Void
+    
+    var body: some View {
+        Button(action: onToggle) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(pack.name)
+                            .font(.system(size: 14, weight: .medium))
+                            .lineLimit(1)
+                            .foregroundColor(.primary)
+                        
+                        if !pack.packDescription.isEmpty {
+                            Text(pack.packDescription)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16))
+                        .foregroundColor(isSelected ? .accentColor : .secondary)
+                }
+                
+                HStack {
+                    Text("\(pack.termCount) terms")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    if let project = pack.project {
+                        Text(project.name)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.accentColor.opacity(0.1) : Color(.controlBackgroundColor))
+                    .stroke(isSelected ? Color.accentColor : Color(.separatorColor), lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }

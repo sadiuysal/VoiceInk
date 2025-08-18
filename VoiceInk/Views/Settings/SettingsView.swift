@@ -202,8 +202,8 @@ struct SettingsView: View {
 
                 SettingsSection(
                     icon: "folder",
-                    title: "Project Context",
-                    subtitle: "Basic configuration for context management"
+                    title: "Projects & Context",
+                    subtitle: "Manage project context, repository analysis, and chat capture"
                 ) {
                     VStack(alignment: .leading, spacing: 12) {
                         Toggle("Enable Project Context", isOn: Binding(
@@ -289,6 +289,71 @@ struct SettingsView: View {
                                 .padding(.leading, 16)
                             }
                         }
+
+						Divider()
+						
+						// Chat Harvest Settings
+						VStack(alignment: .leading, spacing: 12) {
+							Toggle("Auto-capture Cursor Chat", isOn: Binding(
+								get: { UserDefaults.standard.autoCaptureChat },
+								set: { UserDefaults.standard.autoCaptureChat = $0 }
+							))
+							.toggleStyle(.switch)
+							
+							if UserDefaults.standard.autoCaptureChat {
+								VStack(alignment: .leading, spacing: 8) {
+									HStack {
+										Text("Last Messages:")
+											.font(.system(size: 13, weight: .medium))
+										
+										Spacer()
+										
+										Picker("", selection: Binding(
+											get: { UserDefaults.standard.chatLastMessages },
+											set: { UserDefaults.standard.chatLastMessages = $0 }
+										)) {
+											Text("4").tag(4)
+											Text("8").tag(8)
+											Text("12").tag(12)
+											Text("16").tag(16)
+										}
+										.pickerStyle(.menu)
+										.frame(maxWidth: 80)
+									}
+									
+									HStack {
+										Text("Token Cap:")
+											.font(.system(size: 13, weight: .medium))
+										
+										Spacer()
+										
+										Picker("", selection: Binding(
+											get: { UserDefaults.standard.chatTokenCap },
+											set: { UserDefaults.standard.chatTokenCap = $0 }
+										)) {
+											Text("256").tag(256)
+											Text("512").tag(512)
+											Text("1024").tag(1024)
+											Text("2048").tag(2048)
+										}
+										.pickerStyle(.menu)
+										.frame(maxWidth: 80)
+									}
+									
+									Toggle("Include Code Blocks Only", isOn: Binding(
+										get: { UserDefaults.standard.chatCodeOnly },
+										set: { UserDefaults.standard.chatCodeOnly = $0 }
+									))
+									.toggleStyle(.switch)
+									
+									Text("Automatically captures recent chat messages from Cursor IDE for context-aware transcription.")
+										.font(.system(size: 11))
+										.foregroundColor(.secondary)
+										.fixedSize(horizontal: false, vertical: true)
+								}
+								.padding(.leading, 16)
+							}
+						}
 
 						Text("For detailed repository management, use the Project Context panel in Power Mode.")
 							.settingsDescription()

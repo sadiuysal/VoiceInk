@@ -40,13 +40,41 @@ def main():
         if not Path(repo_path).exists():
             raise FileNotFoundError(f"Repository path does not exist: {repo_path}")
         
-        # Execute gitingest
-        summary, tree, content = ingest(
+        # Build kwargs with optional filters
+        kwargs = dict(
             source=repo_path,
             token=token,
             include_submodules=include_submodules,
             include_gitignored=include_gitignored
         )
+        include_patterns = config.get('includePatterns')
+        exclude_patterns = config.get('excludePatterns')
+        max_file_size = config.get('maxFileSize')
+        branch = config.get('branch')
+        if include_patterns:
+            kwargs['include_patterns'] = include_patterns
+        if exclude_patterns:
+            kwargs['exclude_patterns'] = exclude_patterns
+        if max_file_size:
+            try:
+                kwargs['max_file_size'] = int(max_file_size)
+            except Exception:
+                pass
+        if branch:
+            kwargs['branch'] = branch
+
+        # Execute gitingest
+        summary, tree, content = ingest(**kwargs)
+
+        # Normalize summary to a dictionary to ease Swift decoding
+        if hasattr(summary, '__dict__'):
+            summary_dict = summary.__dict__
+        elif isinstance(summary, dict):
+            summary_dict = summary
+        elif hasattr(summary, '_asdict'):
+            summary_dict = summary._asdict()
+        else:
+            summary_dict = {'raw': str(summary)}
         
         # Process summary (handle different return types)
         summary_dict = {}

@@ -113,6 +113,36 @@ struct CustomCloudModel: TranscriptionModel, Codable {
         self.isMultilingualModel = isMultilingual
         self.supportedLanguages = supportedLanguages ?? PredefinedModels.getLanguageDictionary(isMultilingual: isMultilingual)
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, displayName, description, apiEndpoint, apiKey, modelName, isMultilingualModel, supportedLanguages
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.name = try container.decode(String.self, forKey: .name)
+        self.displayName = try container.decode(String.self, forKey: .displayName)
+        self.description = try container.decode(String.self, forKey: .description)
+        self.apiEndpoint = try container.decode(String.self, forKey: .apiEndpoint)
+        self.apiKey = try container.decode(String.self, forKey: .apiKey)
+        self.modelName = try container.decode(String.self, forKey: .modelName)
+        self.isMultilingualModel = try container.decodeIfPresent(Bool.self, forKey: .isMultilingualModel) ?? true
+        self.supportedLanguages = try container.decodeIfPresent([String: String].self, forKey: .supportedLanguages) ?? PredefinedModels.getLanguageDictionary(isMultilingual: self.isMultilingualModel)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encode(description, forKey: .description)
+        try container.encode(apiEndpoint, forKey: .apiEndpoint)
+        try container.encode(apiKey, forKey: .apiKey)
+        try container.encode(modelName, forKey: .modelName)
+        try container.encode(isMultilingualModel, forKey: .isMultilingualModel)
+        try container.encode(supportedLanguages, forKey: .supportedLanguages)
+    }
 } 
 
 struct LocalModel: TranscriptionModel {

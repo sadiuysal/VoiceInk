@@ -22,12 +22,29 @@ struct GitIngestConfig: Codable {
     let token: String?
     let includeSubmodules: Bool
     let includeGitignored: Bool
+    let includePatterns: [String]?
+    let excludePatterns: [String]?
+    let maxFileSize: Int?
+    let branch: String?
     
-    init(path: String, token: String? = nil, includeSubmodules: Bool = false, includeGitignored: Bool = false) {
+    init(
+        path: String,
+        token: String? = nil,
+        includeSubmodules: Bool = false,
+        includeGitignored: Bool = false,
+        includePatterns: [String]? = nil,
+        excludePatterns: [String]? = nil,
+        maxFileSize: Int? = nil,
+        branch: String? = nil
+    ) {
         self.path = path
         self.token = token
         self.includeSubmodules = includeSubmodules
         self.includeGitignored = includeGitignored
+        self.includePatterns = includePatterns
+        self.excludePatterns = excludePatterns
+        self.maxFileSize = maxFileSize
+        self.branch = branch
     }
     
     func jsonString() throws -> String {
@@ -48,12 +65,61 @@ final class GitIngestService: ObservableObject {
     @Published var lastProcessedAt: Date?
     @Published var processProgress: Double = 0.0
     
+    // Simple in-memory cache per (rootPath + mode signature)
+    private var cachedResults: [String: GitIngestResult] = [:]
+    
+    // MARK: - Context Generation Modes
+    enum ContextMode: CaseIterable {
+        case fullRepository
+        case documentationOnly
+        case codeOnly
+        case projectStructure
+        case customFiltered
+        
+        fileprivate func defaultPatterns() -> GitIngestPatterns {
+            switch self {
+            case .fullRepository:
+                return GitIngestPatterns()
+            case .documentationOnly:
+                return GitIngestPatterns(
+                    include: ["*.md", "*.rst", "*.txt", "README*", "CHANGELOG*"],
+                    exclude: ["node_modules/*", ".git/*"],
+                    maxFileSize: 1024 * 100
+                )
+            case .codeOnly:
+                return GitIngestPatterns(
+                    include: ["*.swift", "*.py", "*.js", "*.ts", "*.go", "*.rs"],
+                    exclude: ["*.test.*", "*.spec.*", "dist/*", "build/*", "node_modules/*", ".git/*"],
+                    maxFileSize: 1024 * 200
+                )
+            case .projectStructure:
+                return GitIngestPatterns(
+                    include: ["package.json", "Cargo.toml", "requirements.txt", "Podfile", "*.xcodeproj", "*.gradle", "Makefile", "README*"],
+                    exclude: ["node_modules/*", ".git/*"],
+                    maxFileSize: 1024 * 50
+                )
+            case .customFiltered:
+                return GitIngestPatterns()
+            }
+        }
+    }
+    
+    struct GitIngestPatterns {
+        var include: [String] = []
+        var exclude: [String] = ["node_modules/*", ".git/*", "*.log"]
+        var maxFileSize: Int = 1024 * 50 // 50KB default
+        var branch: String? = nil
+    }
+    
     private var pythonPath: String {
-        // First try bundled Python environment
+        // Prefer relocated project-level venv first
+        if let projectVenvPython = projectVenvPythonPath() {
+            return projectVenvPython
+        }
+        // Then try bundled Python environment inside app resources (if present)
         if let bundledPython = bundledPythonPath() {
             return bundledPython
         }
-        
         // Fallback to system Python
         return "/usr/bin/python3"
     }
@@ -98,7 +164,11 @@ final class GitIngestService: ObservableObject {
                 path: url.path,
                 token: token,
                 includeSubmodules: UserDefaults.standard.gitIngestIncludeSubmodules,
-                includeGitignored: UserDefaults.standard.gitIngestIncludeGitignored
+                includeGitignored: UserDefaults.standard.gitIngestIncludeGitignored,
+                includePatterns: nil,
+                excludePatterns: nil,
+                maxFileSize: nil,
+                branch: nil
             )
             
             await MainActor.run {
@@ -121,6 +191,68 @@ final class GitIngestService: ObservableObject {
             throw error
         }
     }
+
+    func generateContext(
+        for repository: URL,
+        mode: ContextMode,
+        customPatterns: GitIngestPatterns? = nil,
+        token: String? = nil
+    ) async throws -> GitIngestResult {
+        let patterns = (mode == .customFiltered) ? (customPatterns ?? GitIngestPatterns()) : mode.defaultPatterns()
+        let cacheKey = cacheKeyFor(repository: repository, mode: mode, patterns: patterns)
+        if let cached = cachedResults[cacheKey] { return cached }
+        
+        try await verifyGitIngestAvailability()
+        
+        let config = GitIngestConfig(
+            path: repository.path,
+            token: token ?? UserDefaults.standard.gitIngestToken,
+            includeSubmodules: UserDefaults.standard.gitIngestIncludeSubmodules,
+            includeGitignored: UserDefaults.standard.gitIngestIncludeGitignored,
+            includePatterns: patterns.include.isEmpty ? nil : patterns.include,
+            excludePatterns: patterns.exclude.isEmpty ? nil : patterns.exclude,
+            maxFileSize: patterns.maxFileSize,
+            branch: patterns.branch
+        )
+        
+        let result = try await executeGitIngestBridge(with: config)
+        cachedResults[cacheKey] = result
+        return result
+    }
+    
+    func generatePromptReadyContext(for repository: URL, mode: ContextMode = .fullRepository) async throws -> String {
+        let result = try await generateContext(for: repository, mode: mode)
+        var out = ""
+        // Compose in the exact format expected by most LLM processors
+        if let summaryText = serializeSummary(result.summary) {
+            out += summaryText + "\n\n"
+        }
+        out += "\(result.tree)\n\n"
+        out += result.content
+        return out
+    }
+    
+    private func serializeSummary(_ s: GitIngestSummary) -> String? {
+        var lines: [String] = []
+        lines.append("Repository summary:")
+        if let fc = s.fileCount { lines.append("- Files analyzed: \(fc)") }
+        if let dc = s.directoryCount { lines.append("- Directories: \(dc)") }
+        if let ts = s.totalSize { lines.append("- Total size: \(ts) bytes") }
+        if let tk = s.tokenCount { lines.append("- Estimated tokens: \(tk)") }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
+    
+    private func cacheKeyFor(repository: URL, mode: ContextMode, patterns: GitIngestPatterns) -> String {
+        let p = [
+            repository.path,
+            String(describing: mode),
+            patterns.include.joined(separator: ","),
+            patterns.exclude.joined(separator: ","),
+            String(patterns.maxFileSize),
+            patterns.branch ?? "-"
+        ].joined(separator: "|")
+        return String(p.hashValue)
+    }
     
     func checkRepositoryUpdates(at url: URL, since date: Date) async throws -> [String] {
         // This could be enhanced to detect git changes since last sync
@@ -133,12 +265,15 @@ final class GitIngestService: ObservableObject {
     private func bundledPythonPath() -> String? {
         guard let resourcePath = Bundle.main.resourcePath else { return nil }
         let pythonEnvPath = "\(resourcePath)/python-env/bin/python"
-        
-        if FileManager.default.fileExists(atPath: pythonEnvPath) {
-            return pythonEnvPath
-        }
-        
-        return nil
+        return FileManager.default.fileExists(atPath: pythonEnvPath) ? pythonEnvPath : nil
+    }
+
+    private func projectVenvPythonPath() -> String? {
+        // Look for python-env moved to project root to avoid app bundling
+        let projectVenv = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("python-env/bin/python")
+            .path
+        return FileManager.default.fileExists(atPath: projectVenv) ? projectVenv : nil
     }
     
     private func verifyGitIngestAvailability() async throws {
@@ -176,14 +311,31 @@ final class GitIngestService: ObservableObject {
             
             config = json.loads(sys.argv[1])
             try:
-                summary, tree, content = ingest(
-                    config['path'], 
+                kwargs = dict(
+                    source=config['path'],
                     token=config.get('token'),
                     include_submodules=config.get('includeSubmodules', False),
                     include_gitignored=config.get('includeGitignored', False)
                 )
+                if config.get('includePatterns'):
+                    kwargs['include_patterns'] = config.get('includePatterns')
+                if config.get('excludePatterns'):
+                    kwargs['exclude_patterns'] = config.get('excludePatterns')
+                if config.get('maxFileSize'):
+                    kwargs['max_file_size'] = int(config.get('maxFileSize'))
+                if config.get('branch'):
+                    kwargs['branch'] = config.get('branch')
+                summary, tree, content = ingest(**kwargs)
+                if hasattr(summary, '__dict__'):
+                    summary_dict = summary.__dict__
+                elif isinstance(summary, dict):
+                    summary_dict = summary
+                elif hasattr(summary, '_asdict'):
+                    summary_dict = summary._asdict()
+                else:
+                    summary_dict = {'raw': str(summary)}
                 result = {
-                    'summary': summary.__dict__ if hasattr(summary, '__dict__') else str(summary),
+                    'summary': summary_dict,
                     'tree': tree,
                     'content': content,
                     'timestamp': __import__('datetime').datetime.utcnow().isoformat()

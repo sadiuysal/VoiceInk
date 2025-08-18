@@ -427,7 +427,13 @@ final class ContextIndexStore: ObservableObject {
             logger.info("Starting full repository sync with GitIngest for: \(rootURL.path)")
             
             let token = UserDefaults.standard.gitIngestToken
-            let repoDigest = try await gitIngestService.ingestRepository(at: rootURL, token: token)
+            // Use enhanced mode-aware generation to respect user patterns
+            let repoDigest = try await gitIngestService.generateContext(
+                for: rootURL,
+                mode: .fullRepository,
+                customPatterns: nil,
+                token: token
+            )
             
             // Process the repository digest and enhance existing context
             try await processRepositoryDigest(repoDigest, rootURL: rootURL)
@@ -506,13 +512,19 @@ final class ContextIndexStore: ObservableObject {
     // MARK: - Private GitIngest Implementation
     
     private func processRepositoryDigest(_ digest: GitIngestResult, rootURL: URL) async throws {
-        // Store the digest content in a way that can enhance our existing MDI system
-        // This could involve creating virtual segments or enhancing term extraction
-        
+        // Enhance GitIngest output and store meaningful metadata/terms
         logger.info("Processing repository digest with \(digest.summary.fileCount ?? 0) files")
         
-        // Extract repository-wide terms and concepts
-        let repoTerms = extractRepositoryTerms(from: digest.content)
+        // Post-process for richer metadata and dictionary
+        let post = GitIngestPostProcessor()
+        let enhanced = await post.processGitIngestOutput(result: digest)
+        
+        // Merge repository-wide terms from content and dictionary
+        var repoTerms = extractRepositoryTerms(from: digest.content)
+        repoTerms.append(contentsOf: enhanced.dictionary.technicalTerms.prefix(200))
+        repoTerms.append(contentsOf: enhanced.dictionary.types.prefix(100))
+        repoTerms.append(contentsOf: enhanced.dictionary.apis.prefix(100))
+        repoTerms = Array(Set(repoTerms)).sorted()
         
         // Store repository context metadata (could be expanded to use SwiftData model)
         await storeRepositoryContext(digest, rootURL: rootURL, terms: repoTerms)

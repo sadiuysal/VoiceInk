@@ -15,6 +15,9 @@ struct PowerModeContextPanel: View {
     @State private var copyFeedbackMessage = ""
     
     @StateObject private var contextStore = ContextIndexStore.shared
+    @StateObject private var gitIngestService = GitIngestService.shared
+    @State private var selectedMode: GitIngestService.ContextMode = .fullRepository
+    @State private var customPatterns = GitIngestService.GitIngestPatterns()
     
     private let logger = Logger(subsystem: "com.sadiuysal.VoiceInk", category: "PowerModeContextPanel")
     
@@ -543,6 +546,80 @@ struct PowerModeContextPanel: View {
                     .buttonStyle(.plain)
                     .disabled(rootURL == nil)
                 }
+                
+                Divider()
+                    .padding(.vertical, 8)
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("GitIngest Context Generator (Beta)")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    // Mode picker
+                    HStack {
+                        Text("Mode")
+                        Spacer()
+                        Picker("Mode", selection: $selectedMode) {
+                            ForEach(GitIngestService.ContextMode.allCases, id: \.self) { mode in
+                                Text(String(describing: mode))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    
+                    if selectedMode == .customFiltered {
+                        // Include patterns
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Include Patterns (comma-separated)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            TextField("e.g., *.swift, *.md", text: Binding(
+                                get: { customPatterns.include.joined(separator: ", ") },
+                                set: { customPatterns.include = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } }
+                            ))
+                        }
+                        
+                        // Exclude patterns
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Exclude Patterns (comma-separated)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            TextField("e.g., node_modules/*, .git/*", text: Binding(
+                                get: { customPatterns.exclude.joined(separator: ", ") },
+                                set: { customPatterns.exclude = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } }
+                            ))
+                        }
+                        
+                        // Max file size slider
+                        HStack {
+                            Text("Max File Size")
+                            Spacer()
+                            Slider(value: Binding(get: { Double(customPatterns.maxFileSize) }, set: { customPatterns.maxFileSize = Int($0) }), in: 1024...204800, step: 1024)
+                            Text("\(customPatterns.maxFileSize / 1024)KB")
+                                .monospacedDigit()
+                                .frame(width: 50)
+                        }
+                    }
+                    
+                    Button(action: { generateAndCopyGitIngestContext() }) {
+                        HStack {
+                            Image(systemName: "wand.and.stars")
+                            Text("Generate & Copy")
+                                .fontWeight(.medium)
+                            Spacer()
+                            if gitIngestService.isProcessing {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                            } else {
+                                Image(systemName: "arrow.right")
+                            }
+                        }
+                        .padding()
+                        .background(Color.blue.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(rootURL == nil)
+                }
             }
             
             Spacer()
@@ -837,6 +914,33 @@ struct PowerModeContextPanel: View {
         
         copyFeedbackMessage = "Profile context copied!"
         showCopyFeedback()
+    }
+    
+    private func generateAndCopyGitIngestContext() {
+        guard let root = rootURL else { return }
+        Task {
+            do {
+                let result = try await gitIngestService.generateContext(for: root, mode: selectedMode, customPatterns: customPatterns, token: UserDefaults.standard.gitIngestToken)
+                var full = ""
+                // Serialize summary as JSON for clarity
+                if let data = try? JSONEncoder().encode(result.summary), let s = String(data: data, encoding: .utf8) {
+                    full += "Repository Summary\n" + s + "\n\n"
+                }
+                full += result.tree + "\n\n" + result.content
+                await MainActor.run {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(full, forType: .string)
+                    copyFeedbackMessage = "GitIngest context copied!"
+                    showCopyFeedback()
+                }
+            } catch {
+                await MainActor.run {
+                    copyFeedbackMessage = "Generation failed: \(error.localizedDescription)"
+                    showCopyFeedback()
+                }
+                logger.error("GitIngest generation failed: \(error.localizedDescription)")
+            }
+        }
     }
     
     private func exportDictionary(for profile: DictionaryProfile) {

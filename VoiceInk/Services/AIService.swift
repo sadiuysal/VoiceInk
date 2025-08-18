@@ -326,7 +326,7 @@ class AIService: ObservableObject {
         request.httpBody = try? JSONSerialization.data(withJSONObject: testBody)
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
+            if error != nil {
                 completion(false)
                 return
             }
@@ -359,7 +359,7 @@ class AIService: ObservableObject {
         request.httpBody = try? JSONSerialization.data(withJSONObject: testBody)
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
+            if error != nil {
                 completion(false)
                 return
             }
@@ -453,12 +453,9 @@ class AIService: ObservableObject {
     }
     
     func checkOllamaConnection(completion: @escaping (Bool) -> Void) {
-        Task { [weak self] in
-            guard let self = self else { return }
+        Task { @MainActor in
             await self.ollamaService.checkConnection()
-            DispatchQueue.main.async {
-                completion(self.ollamaService.isConnected)
-            }
+            completion(self.ollamaService.isConnected)
         }
     }
     

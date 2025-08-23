@@ -20,8 +20,7 @@ struct MiniRecorderView: View {
                 startPoint: .top,
                 endPoint: .bottom
             )
-            VisualEffectView(material: .hudWindow, blendingMode: .withinWindow)
-                .opacity(0.05)
+            // VisualEffectView removed - using simple background instead
         }
         .clipShape(Capsule())
     }

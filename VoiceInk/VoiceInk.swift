@@ -9,6 +9,38 @@ struct VoiceInkApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     let container: ModelContainer
     
+    // Method to trigger database reset
+    static func triggerDatabaseReset() {
+        UserDefaults.standard.set(true, forKey: "ShouldResetDatabaseForNewSchema")
+        print("🔄 Database reset triggered for next app launch")
+        
+        // Also try to delete the database file immediately if possible
+        if let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("com.sadiuysal.VoiceInk", isDirectory: true) {
+            let storeURL = appSupportURL.appendingPathComponent("default.store")
+            try? FileManager.default.removeItem(at: storeURL)
+            print("🗑️ Database file deleted immediately")
+        }
+    }
+    
+    // Method to check if database reset is needed
+    static func isDatabaseResetNeeded() -> Bool {
+        return UserDefaults.standard.bool(forKey: "ShouldResetDatabaseForNewSchema")
+    }
+    
+    // Method to force delete database file
+    static func forceDeleteDatabase() {
+        if let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("com.sadiuysal.VoiceInk", isDirectory: true) {
+            let storeURL = appSupportURL.appendingPathComponent("default.store")
+            try? FileManager.default.removeItem(at: storeURL)
+            print("🗑️ Database file force deleted")
+            
+            // Also set the reset flag
+            UserDefaults.standard.set(true, forKey: "ShouldResetDatabaseForNewSchema")
+        }
+    }
+    
     @StateObject private var whisperState: WhisperState
     @StateObject private var hotkeyManager: HotkeyManager
     @StateObject private var updaterViewModel: UpdaterViewModel
@@ -25,27 +57,63 @@ struct VoiceInkApp: App {
     private let transcriptionAutoCleanupService = TranscriptionAutoCleanupService.shared
     
     init() {
+        // Create app-specific Application Support directory URL
+        let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("com.sadiuysal.VoiceInk", isDirectory: true)
+        
+        // Create the directory if it doesn't exist
+        try? FileManager.default.createDirectory(at: appSupportURL, withIntermediateDirectories: true)
+        
+        // For development/testing: Force database reset if needed
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--reset-database") {
+            UserDefaults.standard.set(true, forKey: "ShouldResetDatabaseForNewSchema")
+            print("🔧 Debug mode: Database reset flag set")
+        }
+        
+        // Check for other command line options
+        for argument in ProcessInfo.processInfo.arguments {
+            switch argument {
+            case "--reset-database":
+                UserDefaults.standard.set(true, forKey: "ShouldResetDatabaseForNewSchema")
+                print("🔧 Command line: Database reset flag set")
+            case "--help":
+                print("🔧 Available command line options:")
+                print("  --reset-database: Reset database on next launch")
+                print("  --help: Show this help message")
+            default:
+                break
+            }
+        }
+        #endif
+        
+        // Configure SwiftData to use the conventional location
+        let storeURL = appSupportURL.appendingPathComponent("default.store")
+        
         do {
             let schema = Schema([
                 Transcription.self,
-                IndexedDocument.self,
-                MarkdownSegment.self,
-                DictionaryProfile.self,
                 Project.self,
                 ContextSource.self,
                 ContextPack.self,
-                DictionaryEntry.self
+                DictionaryEntry.self,
+                ContentArtifactModel.self,
+                IngestionJobModel.self,
+                ChatStreamModel.self
             ])
             
-            // Create app-specific Application Support directory URL
-            let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("com.sadiuysal.VoiceInk", isDirectory: true)
+            // Check if we need to reset the database due to schema changes
+            let shouldResetDatabase = UserDefaults.standard.bool(forKey: "ShouldResetDatabaseForNewSchema")
             
-            // Create the directory if it doesn't exist
-            try? FileManager.default.createDirectory(at: appSupportURL, withIntermediateDirectories: true)
+            if shouldResetDatabase {
+                // Delete the old database file
+                try? FileManager.default.removeItem(at: storeURL)
+                print("🗑️ Deleted old database for schema reset")
+                
+                // Reset the flag
+                UserDefaults.standard.set(false, forKey: "ShouldResetDatabaseForNewSchema")
+            }
             
-            // Configure SwiftData to use the conventional location
-            let storeURL = appSupportURL.appendingPathComponent("default.store")
             let modelConfiguration = ModelConfiguration(schema: schema, url: storeURL)
             
             container = try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -56,7 +124,36 @@ struct VoiceInkApp: App {
             }
             
         } catch {
-            fatalError("Failed to create ModelContainer for Transcription: \(error.localizedDescription)")
+            print("❌ Failed to create ModelContainer: \(error.localizedDescription)")
+            
+            // If it's a migration error, suggest resetting the database
+            if let nsError = error as NSError?,
+               nsError.domain == NSCocoaErrorDomain && nsError.code == 134110 {
+                print("🔄 Migration error detected. Setting flag to reset database on next launch.")
+                UserDefaults.standard.set(true, forKey: "ShouldResetDatabaseForNewSchema")
+                
+                // Try to create a fresh container without the problematic models
+                do {
+                    let minimalSchema = Schema([
+                        Transcription.self,
+                        Project.self,
+                        ContextSource.self,
+                        ContextPack.self,
+                        DictionaryEntry.self,
+                        ContentArtifactModel.self,
+                        IngestionJobModel.self,
+                        ChatStreamModel.self
+                    ])
+                    
+                    let minimalConfiguration = ModelConfiguration(schema: minimalSchema, url: storeURL)
+                    container = try ModelContainer(for: minimalSchema, configurations: [minimalConfiguration])
+                    print("✅ Created minimal ModelContainer successfully")
+                } catch {
+                    fatalError("Failed to create even minimal ModelContainer: \(error.localizedDescription)")
+                }
+            } else {
+                fatalError("Failed to create ModelContainer for Transcription: \(error.localizedDescription)")
+            }
         }
         
         // Initialize services with proper sharing of instances
@@ -91,9 +188,7 @@ struct VoiceInkApp: App {
         _activeWindowService = StateObject(wrappedValue: activeWindowService)
         
         // Configure ContextIndexStore with shared ModelContainer
-        Task { @MainActor in
-            ContextIndexStore.shared.configure(with: container)
-        }
+        ContextIndexStore.shared.configure(with: container)
     }
     
     var body: some Scene {
@@ -110,10 +205,21 @@ struct VoiceInkApp: App {
                     .onAppear {
                         updaterViewModel.silentlyCheckForUpdates()
                         
-                        // Opportunistically refresh filesystem glossary (non-blocking)
-                        if UserDefaults.standard.bool(forKey: "UseFilesystemContext") {
-                            FilesystemContextService.shared.refreshIfNeeded()
+                        // Initialize new backend services
+                        Task {
+                            do {
+                                try await VoiceInkBackendRegistry.shared.initialize(with: container)
+                            } catch {
+                                print("⚠️ Backend initialization failed: \(error.localizedDescription)")
+                            }
                         }
+                        
+                        // Add a simple way to reset database in development
+                        #if DEBUG
+                        if UserDefaults.standard.bool(forKey: "ShouldResetDatabaseForNewSchema") {
+                            print("🔄 Database reset flag is set. App will reset database on next launch.")
+                        }
+                        #endif
                         
                         AnnouncementsService.shared.start()
                         

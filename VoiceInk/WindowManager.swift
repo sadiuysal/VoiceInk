@@ -7,7 +7,10 @@ class WindowManager {
     private init() {}
     
     func configureWindow(_ window: NSWindow) {
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        let wasFullScreen = window.styleMask.contains(.fullScreen)
+        var desiredMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+        if wasFullScreen { desiredMask.insert(.fullScreen) }
+        window.styleMask = desiredMask
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.backgroundColor = .windowBackgroundColor
@@ -22,7 +25,10 @@ class WindowManager {
     }
     
     func configureOnboardingPanel(_ window: NSWindow) {
-        window.styleMask = [.titled, .fullSizeContentView, .resizable]
+        let wasFullScreen = window.styleMask.contains(.fullScreen)
+        var desiredMask: NSWindow.StyleMask = [.titled, .fullSizeContentView, .resizable]
+        if wasFullScreen { desiredMask.insert(.fullScreen) }
+        window.styleMask = desiredMask
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true

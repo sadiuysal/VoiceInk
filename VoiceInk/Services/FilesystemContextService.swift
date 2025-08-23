@@ -40,7 +40,8 @@ final class FilesystemContextService {
 				if let root = detectActiveProjectRoot() {
 					logger.debug("Detected project root: \(root.path, privacy: .public)")
 					try await buildAndStoreGlossary(for: root)
-					await ProjectFileIndexStore.shared.indexProject(at: root)
+					// TODO: Implement with new backend architecture
+					// await ProjectFileIndexStore.shared.indexProject(at: root)
 					
 					// Also update the Markdown Dictionary Index
 					await ContextIndexStore.shared.indexProject(at: root)
@@ -121,21 +122,22 @@ final class FilesystemContextService {
         let elapsedMs = Int(Date().timeIntervalSince(start) * 1000)
         logger.info("Built glossary with \(terms.count) terms for \(root.lastPathComponent) in \(elapsedMs)ms")
 
+        // TODO: Implement with new backend architecture
         // Save minimal snapshot for Inspector
-        let ttl = UserDefaults.standard.fsRefreshTTLSeconds
-        let limit = UserDefaults.standard.fsTermsLimit
-        let snapshot = ProjectContextSnapshot(
-            id: UUID(),
-            rootPath: root.path,
-            createdAt: Date(),
-            ttlSeconds: ttl,
-            terms: Array(terms.prefix(limit)),
-            sourceStats: ["elapsedMs": elapsedMs],
-            markdownSummary: nil,
-            hashPrefix: nil
-        )
-        try? ProjectContextStore.shared.saveCurrent(snapshot, for: root)
-        _ = try? ProjectContextStore.shared.saveSnapshot(snapshot, for: root)
+        // let ttl = UserDefaults.standard.fsRefreshTTLSeconds
+        // let limit = UserDefaults.standard.fsTermsLimit
+        // let snapshot = ProjectContextSnapshot(
+        //     id: UUID(),
+        //     rootPath: root.path,
+        //     createdAt: Date(),
+        //     ttlSeconds: ttl,
+        //     terms: Array(terms.prefix(limit)),
+        //     sourceStats: ["elapsedMs": elapsedMs],
+        //     markdownSummary: nil,
+        //     hashPrefix: nil
+        // )
+        // try? ProjectContextStore.shared.saveCurrent(snapshot, for: root)
+        // _ = try? ProjectContextStore.shared.saveSnapshot(snapshot, for: root)
     }
     
     private func buildGlossary(for root: URL) throws -> [String] {
@@ -709,14 +711,16 @@ final class FilesystemContextService {
                 if path.hasPrefix(prefix) {
                     let rel = String(path.dropFirst(prefix.count))
                     Task { @MainActor in
-                        try? ProjectFileIndexStore.shared.deletePath(rel, rootPath: root.path)
+                        // TODO: Implement with new backend architecture
+                        // try? ProjectFileIndexStore.shared.deletePath(rel, rootPath: root.path)
                     }
                 }
                 continue
             }
 
             Task { @MainActor in
-                await ProjectFileIndexStore.shared.upsertFile(url, rootURL: root)
+                // TODO: Implement with new backend architecture
+                // await ProjectFileIndexStore.shared.upsertFile(url, rootURL: root)
                 if url.pathExtension.lowercased() == "md" {
                     await ContextIndexStore.shared.indexMarkdownFileIfNeeded(url: url, rootURL: root)
                 }

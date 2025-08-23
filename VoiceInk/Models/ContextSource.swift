@@ -1,13 +1,13 @@
 import Foundation
 import SwiftData
 
-enum ContextSourceType: String, Codable, CaseIterable {
+public enum ContextSourceType: String, Codable, CaseIterable {
     case gitIngest = "git_ingest"
     case manualNotes = "manual_notes"
     case markdown = "markdown"
     case documentation = "documentation"
     
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .gitIngest:
             return "Git Repository"
@@ -20,7 +20,7 @@ enum ContextSourceType: String, Codable, CaseIterable {
         }
     }
     
-    var icon: String {
+    public var icon: String {
         switch self {
         case .gitIngest:
             return "folder.badge.gearshape"
@@ -35,28 +35,28 @@ enum ContextSourceType: String, Codable, CaseIterable {
 }
 
 @Model
-final class ContextSource {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var sourceDescription: String
-    var sourceType: ContextSourceType
-    var sourcePath: String?
-    var configuration: Data // JSON encoded configuration specific to source type
-    var createdAt: Date
-    var lastSyncAt: Date?
-    var isEnabled: Bool
-    var syncStatus: String // "idle", "syncing", "error", "completed"
-    var errorMessage: String?
+public final class ContextSource {
+    @Attribute(.unique) public var id: UUID
+    public var name: String
+    public var sourceDescription: String
+    public var sourceType: ContextSourceType
+    public var sourcePath: String?
+    public var configuration: Data? // JSON encoded configuration specific to source type
+    public var createdAt: Date
+    public var lastSyncAt: Date?
+    public var isEnabled: Bool
+    public var syncStatus: String // "idle", "syncing", "error", "completed"
+    public var errorMessage: String?
     
-    @Relationship var project: Project?
+    @Relationship public var project: Project?
     
-    init(
+    public init(
         id: UUID = UUID(),
         name: String,
         sourceDescription: String = "",
         sourceType: ContextSourceType,
         sourcePath: String? = nil,
-        configuration: Data = Data(),
+        configuration: Data? = nil,
         project: Project? = nil,
         isEnabled: Bool = true
     ) {
@@ -74,7 +74,7 @@ final class ContextSource {
         self.errorMessage = nil
     }
     
-    func updateSyncStatus(_ status: String, errorMessage: String? = nil) {
+    public func updateSyncStatus(_ status: String, errorMessage: String? = nil) {
         self.syncStatus = status
         self.errorMessage = errorMessage
         if status == "completed" {
@@ -85,11 +85,12 @@ final class ContextSource {
 
 // MARK: - Configuration Helpers
 extension ContextSource {
-    func getConfiguration<T: Codable>(_ type: T.Type) -> T? {
-        try? JSONDecoder().decode(type, from: configuration)
+    public func getConfiguration<T: Codable>(_ type: T.Type) -> T? {
+        guard let configuration = configuration else { return nil }
+        return try? JSONDecoder().decode(type, from: configuration)
     }
     
-    func setConfiguration<T: Codable>(_ config: T) throws {
+    public func setConfiguration<T: Codable>(_ config: T) throws {
         self.configuration = try JSONEncoder().encode(config)
     }
 }

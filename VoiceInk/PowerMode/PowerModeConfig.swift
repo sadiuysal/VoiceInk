@@ -307,6 +307,4 @@ class PowerModeManager: ObservableObject {
     func isEmojiInUse(_ emoji: String) -> Bool {
         return configurations.contains { $0.emoji == emoji }
     }
-}  $0.emoji == emoji }
-    }
 } 

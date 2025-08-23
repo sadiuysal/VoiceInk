@@ -1,0 +1,238 @@
+# VoiceInk Cursor Development Rules
+
+## 📚 **DOCUMENTATION MANAGEMENT RULES**
+
+### **Core Documentation Files (ONLY TWO)**
+VoiceInk maintains **exactly two** core documentation files to ensure consistency and avoid fragmentation:
+
+1. **`CLAUDE.md`** - Comprehensive project documentation, architecture decisions, and technical details
+2. **`.cursorrules`** - Development rules, coding standards, and team guidelines
+
+### **Documentation Synchronization Requirements**
+- ✅ **MUST**: Keep both files synchronized with current project status
+- ✅ **MUST**: Update both files when making architectural changes
+- ✅ **MUST**: Use consistent terminology and issue numbering across both files
+- ❌ **NEVER**: Create additional standalone documentation files
+- ❌ **NEVER**: Store project information in README.md or other markdown files
+- ❌ **NEVER**: Allow documentation to become out of sync between the two files
+
+---
+
+## 🎯 **CURRENT PROJECT STATUS (August 2025)**
+
+### **Overall Status**: Foundation Complete, Integration In Progress
+- **✅ Phase 1: Foundation (COMPLETED)**: SwiftData migration, new backend architecture, plugin system
+- **⚠️ Phase 2: Integration (IN PROGRESS)**: Connecting UI to new backend services
+- **❌ Phase 3: Testing & Polish (PENDING)**: End-to-end testing and refinement
+
+### **What's Actually Working**
+- ✅ **Core App**: VoiceInk launches successfully without Core Data errors
+- ✅ **SwiftData Models**: Basic models are functional (Project, ContextSource, ContextPack, etc.)
+- ✅ **Basic UI**: Dashboard, Projects sidebar, and navigation are working
+- ✅ **Database**: SwiftData container initializes successfully with new schema
+- ✅ **Legacy Services**: Most existing functionality still works (transcription, audio, etc.)
+
+### **What's Partially Implemented**
+- ⚠️ **Backend Architecture**: New plugin-based system is defined but not fully integrated
+- ⚠️ **Source Plugins**: GitIngest, MCP, and Manual Files plugins exist but aren't actively used
+- ⚠️ **Context Assembly**: Service exists but not connected to UI
+- ⚠️ **Chat Streams**: Service exists but not connected to UI
+
+### **What's Not Working/Connected**
+- ❌ **Backend Integration**: UI doesn't use the new backend services
+- ❌ **Plugin System**: Source plugins aren't being executed
+- ❌ **Context Management**: Advanced context features aren't functional
+- ❌ **AI Enhancement**: Power Mode features aren't connected to backend
+
+---
+
+## 🏗️ **CURRENT ARCHITECTURE STATUS**
+
+### **Frontend (SwiftUI) - ✅ COMPLETE**
+- **Dashboard**: Main interface with project overview and quick actions
+- **Projects Sidebar**: Project management and navigation
+- **Context Management**: UI for managing context sources and packs
+- **Power Mode**: AI enhancement profile interface (not connected to backend)
+- **Settings**: Configuration and customization interfaces
+
+### **Backend (New Architecture) - ⚠️ IMPLEMENTED BUT NOT CONNECTED**
+- **ProjectRegistry**: Central project management (✅ IMPLEMENTED)
+- **IngestionOrchestrator**: Job scheduling and execution (✅ IMPLEMENTED)
+- **SourcePlugin Protocol**: Plugin interface definition (✅ IMPLEMENTED)
+- **EnhancedContextAssemblyService**: Context composition (✅ IMPLEMENTED)
+- **ChatStreamService**: Real-time chat integration (✅ IMPLEMENTED)
+- **CredentialStore**: Credential management (✅ IMPLEMENTED)
+
+### **Data Layer (SwiftData) - ✅ WORKING**
+- **Models**: Project, ContextSource, ContextPack, DictionaryEntry, etc.
+- **Persistence**: SwiftData container with content-addressable storage
+- **Migration**: Handles schema evolution with automatic reset mechanism
+
+---
+
+## 🎯 **IMMEDIATE DEVELOPMENT PRIORITIES**
+
+### **Priority 1: Connect Projects View to Backend**
+- Integrate `ProjectRegistry.shared` with `ProjectsView`
+- Connect project creation/editing to backend services
+- Implement context source management through backend
+
+### **Priority 2: Activate Source Plugins**
+- Connect GitIngest, MCP, and Manual Files plugins to UI
+- Implement plugin execution workflows
+- Add plugin status and health monitoring
+
+### **Priority 3: Implement Context Assembly**
+- Connect context composition to Projects interface
+- Implement context preview and export
+- Add context binding to AI enhancement profiles
+
+### **Priority 4: Integrate Power Mode**
+- Connect AI enhancement profiles to backend services
+- Implement context-aware enhancement
+- Add real-time context updates
+
+---
+
+## 🔧 **DEVELOPMENT GUIDELINES**
+
+### **Current Architecture**
+- **Frontend**: SwiftUI with SwiftData (✅ WORKING)
+- **Backend**: Plugin-based architecture with actor isolation (✅ IMPLEMENTED, ❌ NOT CONNECTED)
+- **Data Flow**: Legacy services → New backend services → UI (⚠️ PARTIAL)
+
+### **Code Organization**
+```
+VoiceInk/
+├── Models/               # SwiftData models (✅ WORKING)
+├── Services/            # Business logic services (MIXED)
+│   ├── Backend/         # New plugin-based backend (✅ IMPLEMENTED, ❌ NOT CONNECTED)
+│   │   ├── Core/        # Project Registry, Context Assembly, Enhancement Export
+│   │   ├── Plugins/     # Source plugins (GitIngest, MCP, Manual Files, Chat)
+│   │   ├── Orchestration/ # Job scheduling and execution
+│   │   ├── Storage/     # Content-addressable storage and caching
+│   │   └── Testing/     # Comprehensive test framework
+│   └── Legacy/          # Legacy services (✅ MOSTLY WORKING)
+├── Views/               # SwiftUI views (✅ COMPLETE)
+│   ├── Projects/        # Projects sidebar with Context Management
+│   ├── PowerMode/       # AI enhancement profiles (not connected)
+│   └── Settings/        # Configuration interfaces
+├── Utilities/           # Helper functions
+└── Resources/           # Assets and bundled resources
+```
+
+### **Integration Points**
+- **Projects**: Use `ProjectRegistry.shared` for project management
+- **Context**: Use `EnhancedContextAssemblyService.shared` for context composition
+- **Plugins**: Use `PluginRegistry.shared` for source plugin management
+- **Chat**: Use `ChatStreamService.shared` for real-time chat integration
+
+---
+
+## 📝 **DEVELOPMENT WORKFLOW**
+
+### **When Adding New Features**
+1. **Check Current State**: Verify if backend service exists and is connected
+2. **Connect to Backend**: Use existing backend services when possible
+3. **Update UI**: Modify views to use backend services instead of legacy
+4. **Test Integration**: Verify end-to-end functionality
+5. **Update Documentation**: Keep CLAUDE.md and .cursorrules synchronized
+
+### **When Fixing Issues**
+1. **Identify Scope**: Determine if issue is in legacy or new backend
+2. **Use Appropriate Service**: Legacy services for existing features, new backend for new features
+3. **Maintain Compatibility**: Don't break existing functionality
+4. **Test Thoroughly**: Ensure both legacy and new features work
+
+### **When Refactoring**
+1. **Preserve Functionality**: Don't remove working features
+2. **Gradual Migration**: Move from legacy to new backend incrementally
+3. **Update Integration Points**: Ensure UI uses correct services
+4. **Document Changes**: Update both documentation files
+
+---
+
+## 🚫 **COMMON PITFALLS TO AVOID**
+
+### **Architecture Anti-patterns**
+- ❌ **DON'T** create new services when backend services already exist
+- ❌ **DON'T** bypass the new backend architecture for new features
+- ❌ **DON'T** mix legacy and new backend calls in the same component
+- ❌ **DON'T** assume backend services are working without testing integration
+
+### **Development Anti-patterns**
+- ❌ **DON'T** modify working legacy services unnecessarily
+- ❌ **DON'T** create duplicate functionality between legacy and new backend
+- ❌ **DON'T** ignore the plugin system when adding new data sources
+- ❌ **DON'T** forget to update both documentation files
+
+---
+
+## 🎯 **SUCCESS METRICS**
+
+### **Integration Goals**
+- ✅ **Backend Services**: All new backend services are implemented
+- ⚠️ **UI Integration**: Projects view connected to backend (IN PROGRESS)
+- ❌ **Plugin Activation**: Source plugins executing and providing data
+- ❌ **Context Assembly**: Advanced context features functional
+- ❌ **Power Mode Integration**: AI enhancement connected to backend
+
+### **Performance Targets**
+- ⚡ Context composition must complete in <200ms (✅ READY, ❌ NOT TESTED)
+- ⚡ Chat harvest timeout is 150ms (✅ READY, ❌ NOT TESTED)
+- ⚡ Job scheduling <50ms (✅ READY, ❌ NOT TESTED)
+
+---
+
+## 🔄 **MIGRATION STRATEGY**
+
+### **Current State**
+- **Legacy Services**: Most functionality still works through existing services
+- **New Backend**: Complete architecture ready for integration
+- **UI**: Complete interface ready for backend connection
+
+### **Migration Path**
+1. **Phase 1**: Connect Projects view to backend (IN PROGRESS)
+2. **Phase 2**: Activate source plugins and context assembly
+3. **Phase 3**: Integrate Power Mode with backend services
+4. **Phase 4**: End-to-end testing and performance optimization
+5. **Phase 5**: Legacy service deprecation and cleanup
+
+---
+
+## 📚 **KEY FILES TO UNDERSTAND**
+
+### **Backend Architecture (New)**
+- `VoiceInkBackendRegistry.swift` - Service coordination and lifecycle
+- `ProjectRegistry.swift` - Central project management hub
+- `IngestionOrchestrator.swift` - Job scheduling and execution
+- `EnhancedContextAssemblyService.swift` - Multi-source context assembly
+- `SourcePlugin.swift` - Plugin protocol and interface
+
+### **Source Plugins (New)**
+- `EnhancedGitIngestPlugin.swift` - Multi-job repository analysis
+- `MCPCrawlerPlugin.swift` - Web scraping via MCP tools
+- `ManualFilesPlugin.swift` - File selection and indexing
+
+### **UI Integration Points**
+- `ProjectsView.swift` - Main projects interface (needs backend connection)
+- `DashboardView.swift` - Main dashboard (uses legacy services)
+- `PowerModeView.swift` - AI enhancement (needs backend connection)
+
+### **Legacy Services (Still Working)**
+- `GitService.swift` - Basic Git operations
+- `AIService.swift` - AI enhancement (basic functionality)
+- `TranscriptionService.swift` - Transcription management
+- `AudioDeviceManager.swift` - Audio device management
+
+---
+
+## 🎉 **SUMMARY**
+
+VoiceInk has successfully completed the foundation phase with a new SwiftData-based architecture and plugin-based backend system. The application launches successfully and has a complete UI, but the new backend features aren't yet connected to the interface.
+
+**Current Focus**: Integration phase - connecting UI to backend services
+**Development Approach**: Gradual migration from legacy to new backend
+**Success Criteria**: All new features functional and connected to UI
+
+The codebase is well-structured and ready for active development to complete the integration phase and bring the advanced context management and AI enhancement features to life.

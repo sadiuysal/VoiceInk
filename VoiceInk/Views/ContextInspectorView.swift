@@ -468,10 +468,10 @@ struct ContextInspectorView: View {
         
         for entry in entries {
             let tags = entry.tags.map { "[\($0)]" }.joined(separator: " ")
-            let refs = entry.refs.prefix(3).joined(separator: ", ")
-            markdown += "- **\(entry.label)** \(tags) — refs: \(refs)\n"
-            if !entry.examples.isEmpty {
-                markdown += "  - _\(entry.examples[0])_\n"
+            let refs = entry.sourceFile ?? "unknown"
+            markdown += "- **\(entry.term)** \(tags) — refs: \(refs)\n"
+            if let context = entry.context, !context.isEmpty {
+                markdown += "  - _\(context)_\n"
             }
             markdown += "\n"
         }
@@ -498,7 +498,7 @@ struct ContextInspectorView: View {
         var context = "# Project Context Dictionary\n\n"
         
         for entry in entries.prefix(50) { // Limit for context window
-            context += "- \(entry.label): \(entry.examples.first ?? "")\n"
+            context += "- \(entry.term): \(entry.context ?? "")\n"
         }
         
         return context

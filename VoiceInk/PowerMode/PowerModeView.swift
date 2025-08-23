@@ -83,7 +83,7 @@ struct PowerModeView: View {
                                  )
                             }
                             
-                            Text("Automate your workflows with context-aware configurations.")
+                            Text("Configure AI enhancement behavior for different applications and websites.")
                                 .font(.system(size: 14))
                                 .foregroundColor(.secondary)
                         }
@@ -121,10 +121,6 @@ struct PowerModeView: View {
                 GeometryReader { geometry in
                     ScrollView {
                         VStack(spacing: 20) {
-                            // Context Management Panel
-                            PowerModeContextPanel()
-                                .padding(.horizontal, 24)
-                            
                             if powerModeManager.configurations.isEmpty {
                                 VStack(spacing: 24) {
                                     Spacer()
@@ -140,7 +136,7 @@ struct PowerModeView: View {
                                                 .font(.system(size: 20, weight: .medium))
                                                 .foregroundColor(.primary)
                                             
-                                            Text("Create first power mode to automate your VoiceInk workflow based on apps/website you are using")
+                                            Text("Create your first Power Mode to configure AI enhancement behavior for specific applications and websites")
                                                 .font(.system(size: 14))
                                                 .foregroundColor(.secondary)
                                                 .multilineTextAlignment(.center)

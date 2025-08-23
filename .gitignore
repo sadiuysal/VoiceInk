@@ -99,3 +99,6 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk 
+
+# Python Environment
+python-env/ 

@@ -2,23 +2,24 @@ import Foundation
 import SwiftData
 
 @Model
-final class ContextPack {
-    @Attribute(.unique) var id: UUID
-    var name: String
-    var packDescription: String
-    var isActive: Bool
-    var createdAt: Date
-    var updatedAt: Date
-    var sourceIds: [UUID] // References to ContextSource IDs
-    var filterConfiguration: Data // JSON encoded filter settings
-    var termCount: Int // Cached count of dictionary entries
+public final class ContextPack {
+    @Attribute(.unique) public var id: UUID
+    public var name: String
+    public var packDescription: String
+    public var isActive: Bool
+    public var createdAt: Date
+    public var updatedAt: Date
+    public var sourceIds: [UUID] // References to ContextSource IDs
+    public var filterConfiguration: Data // JSON encoded filter settings
+    public var termCount: Int // Cached count of dictionary entries
+    public var lastSyncDate: Date? // Last synchronization with sources
     
-    @Relationship var project: Project?
+    @Relationship public var project: Project?
     
     @Relationship(deleteRule: .cascade, inverse: \DictionaryEntry.pack)
-    var entries: [DictionaryEntry] = []
+    public var entries: [DictionaryEntry] = []
     
-    init(
+    public init(
         id: UUID = UUID(),
         name: String,
         packDescription: String = "",
@@ -36,41 +37,47 @@ final class ContextPack {
         self.updatedAt = Date()
         self.filterConfiguration = Data()
         self.termCount = 0
+        self.lastSyncDate = nil
     }
     
-    func updateTimestamp() {
+    public func updateTimestamp() {
         updatedAt = Date()
     }
     
-    func updateTermCount() {
+    public func updateTermCount() {
         termCount = entries.count
     }
     
-    func addSourceId(_ sourceId: UUID) {
+    public func updateSyncDate() {
+        lastSyncDate = Date()
+        updateTimestamp()
+    }
+    
+    public func addSourceId(_ sourceId: UUID) {
         if !sourceIds.contains(sourceId) {
             sourceIds.append(sourceId)
             updateTimestamp()
         }
     }
     
-    func removeSourceId(_ sourceId: UUID) {
+    public func removeSourceId(_ sourceId: UUID) {
         sourceIds.removeAll { $0 == sourceId }
         updateTimestamp()
     }
 }
 
 // MARK: - Filter Configuration
-struct PackFilterConfiguration: Codable {
-    let includeFileTypes: [String]
-    let excludeFileTypes: [String]
-    let minTermLength: Int
-    let maxTermLength: Int
-    let minFrequency: Int
-    let includeCodeBlocks: Bool
-    let includeComments: Bool
-    let termLimit: Int?
+public struct PackFilterConfiguration: Codable {
+    public var includeFileTypes: [String]
+    public var excludeFileTypes: [String]
+    public var minTermLength: Int
+    public var maxTermLength: Int
+    public var minFrequency: Int
+    public var includeCodeBlocks: Bool
+    public var includeComments: Bool
+    public var termLimit: Int?
     
-    init(
+    public init(
         includeFileTypes: [String] = [],
         excludeFileTypes: [String] = [],
         minTermLength: Int = 2,

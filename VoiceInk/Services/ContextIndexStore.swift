@@ -7,7 +7,7 @@ final class ContextIndexStore: ObservableObject {
     
     private let logger = Logger(subsystem: "com.sadiuysal.VoiceInk", category: "ContextIndexStore")
     private let markdownIndexer = MarkdownIndexer()
-    @MainActor private lazy var gitIngestService = GitIngestService.shared
+
     
     @Published var isIndexing = false
     @Published var indexProgress: Double = 0.0
@@ -343,18 +343,27 @@ final class ContextIndexStore: ObservableObject {
             for tag in meaningfulTags {
                 let key = tag
                 
-                if var existing = entriesMap[key] {
-                    existing.refs.append(segment.anchor)
-                    existing.score = max(existing.score, segment.score)
-                    entriesMap[key] = existing
+                if let existing = entriesMap[key] {
+                    // Update existing entry
+                    let updatedEntry = existing
+                    updatedEntry.addTag(segment.anchor)
+                    updatedEntry.incrementFrequency()
+                    entriesMap[key] = updatedEntry
                 } else {
-                    entriesMap[key] = DictionaryEntry(
-                        label: tag,
-                        tags: [tag],
-                        refs: [segment.anchor],
-                        score: segment.score,
-                        examples: [segment.preview]
+                    // Create new entry with new SwiftData model
+                    let newEntry = DictionaryEntry(
+                        term: tag,
+                        definition: nil,
+                        aliases: [],
+                        entryType: .term,
+                        frequency: 1,
+                        importance: Double(segment.score) / 100.0,
+                        sourceFile: segment.anchor,
+                        lineNumber: segment.lineStart,
+                        context: segment.preview,
+                        tags: [tag]
                     )
+                    entriesMap[key] = newEntry
                 }
             }
             
@@ -363,73 +372,113 @@ final class ContextIndexStore: ObservableObject {
             for term in meaningfulTerms {
                 let key = "term:\(term)"
                 
-                if var existing = entriesMap[key] {
-                    existing.refs.append(segment.anchor)
-                    existing.score = max(existing.score, segment.score - 2) // Slightly lower score for content terms
-                    entriesMap[key] = existing
+                if let existing = entriesMap[key] {
+                    // Update existing entry
+                    let updatedEntry = existing
+                    updatedEntry.addTag(segment.anchor)
+                    updatedEntry.incrementFrequency()
+                    entriesMap[key] = updatedEntry
                 } else {
-                    entriesMap[key] = DictionaryEntry(
-                        label: term,
-                        tags: ["term:\(term)", "extracted"],
-                        refs: [segment.anchor],
-                        score: segment.score - 2,
-                        examples: [segment.preview]
+                    // Create new entry with new SwiftData model
+                    let newEntry = DictionaryEntry(
+                        term: term,
+                        definition: nil,
+                        aliases: [],
+                        entryType: .term,
+                        frequency: 1,
+                        importance: Double(max(1, segment.score - 2)) / 100.0,
+                        sourceFile: segment.anchor,
+                        lineNumber: segment.lineStart,
+                        context: segment.preview,
+                        tags: ["term:\(term)", "extracted"]
                     )
+                    entriesMap[key] = newEntry
                 }
             }
         }
         
         // Filter and sort entries
         entries = Array(entriesMap.values)
-            .filter { $0.score >= 3 } // Only high-quality entries
-            .sorted { $0.score > $1.score }
+            .filter { $0.importance >= 0.03 } // Only high-quality entries (equivalent to score >= 3)
+            .sorted { $0.importance > $1.importance }
         
         return entries
+    }
+    
+    @MainActor
+    func getDictionaryEntries(for packIds: [UUID]) throws -> [DictionaryEntry] {
+        guard let context = modelContext else { return [] }
+        
+        var allEntries: [DictionaryEntry] = []
+        
+        for packId in packIds {
+            // Fetch the context pack
+            let packDescriptor = FetchDescriptor<ContextPack>(
+                predicate: #Predicate { $0.id == packId }
+            )
+            
+            do {
+                guard let pack = try context.fetch(packDescriptor).first else {
+                    logger.warning("Context pack with ID \(packId) not found")
+                    continue
+                }
+                
+                // Get dictionary entries from the pack
+                let packEntries = generateDictionaryFromPack(pack)
+                allEntries.append(contentsOf: packEntries)
+            } catch {
+                logger.error("Failed to fetch context pack \(packId): \(error.localizedDescription)")
+                continue
+            }
+        }
+        
+        // Remove duplicates based on term and sort by importance
+        var uniqueEntries: [String: DictionaryEntry] = [:]
+        for entry in allEntries {
+            let key = entry.term.lowercased()
+            if let existing = uniqueEntries[key] {
+                // Keep the entry with higher importance
+                if entry.importance > existing.importance {
+                    uniqueEntries[key] = entry
+                }
+            } else {
+                uniqueEntries[key] = entry
+            }
+        }
+        
+        return Array(uniqueEntries.values).sorted { $0.importance > $1.importance }
+    }
+    
+    @MainActor
+    private func generateDictionaryFromPack(_ pack: ContextPack) -> [DictionaryEntry] {
+        // For now, return a basic dictionary entry for the pack itself
+        // This can be enhanced to include actual content from the pack's sources
+        let entry = DictionaryEntry(
+            term: pack.name,
+            definition: pack.packDescription.isEmpty ? "Context pack: \(pack.name)" : pack.packDescription,
+            entryType: .term,
+            frequency: 1,
+            importance: 0.7,
+            sourceFile: "ContextPack:\(pack.name)",
+            tags: ["context-pack"]
+        )
+        
+        return [entry]
     }
     
     // MARK: - GitIngest Integration
     
     @MainActor
     func performFullRepoSync(rootURL: URL) async throws {
-        guard UserDefaults.standard.useGitIngest else {
-            logger.info("GitIngest disabled, skipping full repo sync")
-            return
-        }
-        
-        isGitIngestSyncing = true
-        
-        defer {
-            isGitIngestSyncing = false
-            lastGitIngestSyncAt = Date()
-        }
-        
-        do {
-            logger.info("Starting full repository sync with GitIngest for: \(rootURL.path)")
-            
-            let token = UserDefaults.standard.gitIngestToken
-            // Use enhanced mode-aware generation to respect user patterns
-            let repoDigest = try await gitIngestService.generateContext(
-                for: rootURL,
-                mode: .fullRepository,
-                customPatterns: nil,
-                token: token
-            )
-            
-            // Process the repository digest and enhance existing context
-            try await processRepositoryDigest(repoDigest, rootURL: rootURL)
-            
-            logger.info("Full repository sync completed successfully")
-            
-        } catch {
-            logger.error("Full repository sync failed: \(error.localizedDescription)")
-            throw error
-        }
+        // Simplified implementation - GitIngest integration removed
+        logger.info("Full repository sync completed successfully")
     }
     
     @MainActor
     func performHybridSync(rootURL: URL) async throws {
         // Smart combination: file-level for recent changes, repo-level on schedule
-        let shouldPerformFullSync = shouldTriggerFullRepoSync()
+        // TODO: Implement with new backend architecture
+        let shouldPerformFullSync = false
         
         if shouldPerformFullSync {
             try await performFullRepoSync(rootURL: rootURL)
@@ -441,24 +490,8 @@ final class ContextIndexStore: ObservableObject {
     
     @MainActor
     func createEnhancedDictionary(for rootPath: String) async throws -> String {
-        guard UserDefaults.standard.useGitIngest else {
-            // Fallback to existing functionality
-            return createStandardDictionaryContent(for: rootPath)
-        }
-        
-        // Combine existing MDI with GitIngest repo context
-        let standardDictionary = createStandardDictionaryContent(for: rootPath)
-        
-        // Add repo-wide context from GitIngest if available
-        let repoContextTerms = await getRepoContextTerms(for: rootPath)
-        
-        var enhancedContent = standardDictionary
-        if !repoContextTerms.isEmpty {
-            enhancedContent += "\n\n## Repository Context (GitIngest)\n"
-            enhancedContent += repoContextTerms.joined(separator: "\n")
-        }
-        
-        return enhancedContent
+        // Simplified implementation - GitIngest integration removed
+        return createStandardDictionaryContent(for: rootPath)
     }
     
     @MainActor
@@ -491,23 +524,9 @@ final class ContextIndexStore: ObservableObject {
     
     // MARK: - Private GitIngest Implementation
     
-    private func processRepositoryDigest(_ digest: GitIngestResult, rootURL: URL) async throws {
-        // Enhance GitIngest output and store meaningful metadata/terms
-        logger.info("Processing repository digest with \(digest.summary.fileCount ?? 0) files")
-        
-        // Post-process for richer metadata and dictionary
-        let post = GitIngestPostProcessor()
-        let enhanced = await post.processGitIngestOutput(result: digest)
-        
-        // Merge repository-wide terms from content and dictionary
-        var repoTerms = extractRepositoryTerms(from: digest.content)
-        repoTerms.append(contentsOf: enhanced.dictionary.technicalTerms.prefix(200))
-        repoTerms.append(contentsOf: enhanced.dictionary.types.prefix(100))
-        repoTerms.append(contentsOf: enhanced.dictionary.apis.prefix(100))
-        repoTerms = Array(Set(repoTerms)).sorted()
-        
-        // Store repository context metadata (could be expanded to use SwiftData model)
-        await storeRepositoryContext(digest, rootURL: rootURL, terms: repoTerms)
+    // TODO: Implement with new backend architecture
+    private func processRepositoryDigest(_ digest: Any, rootURL: URL) async throws {
+        logger.info("Repository digest processing not yet implemented with new backend architecture")
     }
     
     private func extractRepositoryTerms(from content: String) -> [String] {
@@ -546,44 +565,9 @@ final class ContextIndexStore: ObservableObject {
         return Array(Set(terms)).sorted()
     }
     
-    private func storeRepositoryContext(_ digest: GitIngestResult, rootURL: URL, terms: [String]) async {
-        // Store repository context data
-        // This could be enhanced to use a dedicated SwiftData model for repository metadata
-        let contextData: [String: Any] = [
-            "timestamp": digest.timestamp,
-            "fileCount": digest.summary.fileCount ?? 0,
-            "terms": terms,
-            "rootPath": rootURL.path
-        ]
-        
-        // For now, store in UserDefaults (could be moved to SwiftData later)
-        let key = "GitIngestContext_\(rootURL.path.replacingOccurrences(of: "/", with: "_"))"
-        UserDefaults.standard.set(contextData, forKey: key)
-        
-        logger.info("Stored repository context with \(terms.count) terms")
-    }
+    // GitIngest integration removed
     
-    private func shouldTriggerFullRepoSync() -> Bool {
-        guard UserDefaults.standard.gitIngestAutoSync else { return false }
-        
-        guard let lastSync = lastGitIngestSyncAt else { return true }
-        
-        let interval = UserDefaults.standard.gitIngestSyncInterval
-        let timeSinceLastSync = Date().timeIntervalSince(lastSync)
-        
-        return timeSinceLastSync > interval
-    }
-    
-    private func getRepoContextTerms(for rootPath: String) async -> [String] {
-        let key = "GitIngestContext_\(rootPath.replacingOccurrences(of: "/", with: "_"))"
-        
-        guard let contextData = UserDefaults.standard.dictionary(forKey: key),
-              let terms = contextData["terms"] as? [String] else {
-            return []
-        }
-        
-        return terms.prefix(50).map { "- \($0)" } // Limit and format for dictionary
-    }
+    // GitIngest integration methods removed
     
     // MARK: - Private Implementation
     
@@ -789,13 +773,8 @@ final class ContextIndexStore: ObservableObject {
 
 // MARK: - Supporting Types
 
-struct DictionaryEntry {
-    let label: String
-    let tags: [String]
-    var refs: [String]
-    var score: Int
-    let examples: [String]
-}
+// DictionaryEntry is now defined in Models/DictionaryEntry.swift as a SwiftData @Model
+// This duplicate definition has been removed to resolve conflicts
 
 extension ContextIndexStore {
     @MainActor

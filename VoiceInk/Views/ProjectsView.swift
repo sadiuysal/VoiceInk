@@ -5,21 +5,20 @@ struct ProjectsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var projects: [Project]
     @State private var selectedProject: Project?
-    @State private var selectedTab: ProjectTab = .sources
+    @State private var selectedTab: ProjectTab = .overview
     @State private var showingCreateProject = false
+    @State private var showingContextManagement = false
     
     enum ProjectTab: String, CaseIterable {
+        case overview = "Overview"
         case sources = "Sources"
-        case packs = "Packs"
         case dictionary = "Dictionary"
-        case sync = "Sync"
         
         var icon: String {
             switch self {
+            case .overview: return "info.circle"
             case .sources: return "folder.badge.gearshape"
-            case .packs: return "archivebox"
             case .dictionary: return "character.book.closed"
-            case .sync: return "arrow.clockwise"
             }
         }
     }
@@ -35,12 +34,20 @@ struct ProjectsView: View {
                     
                     Spacer()
                     
-                    Button(action: { showingCreateProject = true }) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .medium))
+                    HStack(spacing: 8) {
+                        Button("Context Management") {
+                            showingContextManagement = true
+                        }
+                        .buttonStyle(.bordered)
+                        .font(.caption)
+                        
+                        Button(action: { showingCreateProject = true }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .foregroundColor(.accentColor)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .foregroundColor(.accentColor)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -111,6 +118,12 @@ struct ProjectsView: View {
         .sheet(isPresented: $showingCreateProject) {
             CreateProjectView()
         }
+        .onChange(of: showingContextManagement) { _, newValue in
+            if newValue {
+                ContextManagementWindowManager.shared.openContextManagementWindow()
+                showingContextManagement = false
+            }
+        }
     }
 }
 
@@ -119,42 +132,73 @@ struct ProjectRowView: View {
     let project: Project
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(project.name)
-                    .font(.system(size: 15, weight: .medium))
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(project.name)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    if !project.projectDescription.isEmpty {
+                        Text(htmlString: project.projectDescription)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
+                }
                 
                 Spacer()
                 
-                if !project.isActive {
-                    Image(systemName: "pause.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.orange)
+                VStack(alignment: .trailing, spacing: 4) {
+                    if let branch = project.currentBranch {
+                        HStack(spacing: 4) {
+                            Image(systemName: "git.branch")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text(branch)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    if let lastCommit = project.lastCommitHash {
+                        HStack(spacing: 4) {
+                            Image(systemName: "commit")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Text(lastCommit.prefix(8))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .font(.system(.caption, design: .monospaced))
+                        }
+                    }
                 }
             }
             
-            if !project.projectDescription.isEmpty {
-                Text(project.projectDescription)
+            HStack(spacing: 16) {
+                Label("\(project.sourceCount) sources", systemImage: "folder.badge.gearshape")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .lineLimit(2)
-            }
-            
-            HStack(spacing: 12) {
-                Label("\(project.sourceCount)", systemImage: "folder")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
                 
-                Label("\(project.packCount)", systemImage: "archivebox")
-                    .font(.caption2)
+                Label("\(project.packCount) packs", systemImage: "archivebox")
+                    .font(.caption)
                     .foregroundColor(.secondary)
                 
                 if let lastSync = project.lastSyncDate {
-                    Text(lastSync, style: .relative)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Text(lastSync, style: .relative)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
+                
+                Spacer()
             }
         }
         .padding(.vertical, 4)
@@ -177,18 +221,60 @@ struct ProjectDetailView: View {
                             .fontWeight(.semibold)
                         
                         if !project.projectDescription.isEmpty {
-                            Text(project.projectDescription)
+                            Text(htmlString: project.projectDescription)
                                 .font(.body)
                                 .foregroundColor(.secondary)
                         }
                     }
                     
                     Spacer()
-                    
-                    Button("Settings") {
-                        // TODO: Project settings
+                }
+                
+                // Git information
+                if project.currentBranch != nil || project.remoteOrigin != nil {
+                    HStack(spacing: 16) {
+                        if let branch = project.currentBranch {
+                            HStack(spacing: 4) {
+                                Image(systemName: "git.branch")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Text(branch)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .fontWeight(.medium)
+                            }
+                        }
+                        
+                        if let remote = project.remoteOrigin {
+                            HStack(spacing: 4) {
+                                Image(systemName: "globe")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Text(remote)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        
+                        if let lastCommit = project.lastCommitHash, let author = project.lastCommitAuthor {
+                            HStack(spacing: 4) {
+                                Image(systemName: "commit")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Text("\(lastCommit.prefix(8)) by \(author)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .font(.system(.caption, design: .monospaced))
+                            }
+                        }
+                        
+                        Spacer()
                     }
-                    .buttonStyle(.bordered)
+                    .padding(.horizontal, 4)
                 }
                 
                 if let rootPath = project.rootPath {
@@ -240,14 +326,12 @@ struct ProjectDetailView: View {
             // Tab Content
             Group {
                 switch selectedTab {
+                case .overview:
+                    ProjectOverviewView(project: project)
                 case .sources:
                     ProjectSourcesView(project: project)
-                case .packs:
-                    ProjectPacksView(project: project)
                 case .dictionary:
                     ProjectDictionaryView(project: project)
-                case .sync:
-                    ProjectSyncView(project: project)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -402,7 +486,6 @@ struct AddSourceView: View {
             }
             .formStyle(.grouped)
             .navigationTitle("Add Source")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -579,26 +662,16 @@ struct CreatePackView: View {
     @Environment(\.modelContext) private var modelContext
     
     @State private var name = ""
-    @State private var description = ""
     
     var body: some View {
         NavigationView {
             Form {
                 Section("Pack Details") {
                     TextField("Pack Name", text: $name)
-                    TextField("Description (optional)", text: $description, axis: .vertical)
-                        .lineLimit(3...6)
-                }
-                
-                Section("Configuration") {
-                    Text("Advanced filtering options will be available after creation.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
                 }
             }
             .formStyle(.grouped)
             .navigationTitle("Create Context Pack")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -614,13 +687,13 @@ struct CreatePackView: View {
                 }
             }
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 400, height: 200)
     }
     
     private func createPack() {
         let pack = ContextPack(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            packDescription: description.trimmingCharacters(in: .whitespacesAndNewlines),
+            packDescription: "",
             project: project
         )
         
@@ -806,50 +879,150 @@ struct CreateProjectView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     
-    @State private var name = ""
-    @State private var description = ""
     @State private var rootPath = ""
     @State private var showingFileImporter = false
+    @State private var isDetecting = false
+    @State private var detectedInfo: RepositoryInfo?
+    @State private var errorMessage: String?
     
     var body: some View {
         NavigationView {
-            Form {
-                Section("Project Details") {
-                    TextField("Project Name", text: $name)
-                    TextField("Description (optional)", text: $description, axis: .vertical)
-                        .lineLimit(3...6)
-                }
-                
-                Section("Location") {
-                    HStack {
-                        TextField("Root Path (optional)", text: $rootPath)
+            VStack(spacing: 20) {
+                if isDetecting {
+                    // Detection in progress
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.2)
                         
-                        Button("Browse") {
+                        Text("Detecting repository...")
+                            .font(.headline)
+                        
+                        Text("Analyzing Git repository and extracting project information")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let info = detectedInfo {
+                    // Repository detected - show summary
+                    VStack(spacing: 20) {
+                        // Success indicator
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.title2)
+                            
+                            Text("Repository Detected!")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                        }
+                        
+                        // Repository info
+                        VStack(alignment: .leading, spacing: 12) {
+                            ProjectInfoRow(label: "Project Name", value: info.displayName)
+                            ProjectInfoRow(label: "Current Branch", value: info.currentBranch)
+                            if let remote = info.remoteOrigin {
+                                ProjectInfoRow(label: "Remote Origin", value: remote)
+                            }
+                            ProjectInfoRow(label: "Last Commit", value: "\(info.lastCommit.shortHash) by \(info.lastCommit.author)")
+                            if !info.projectDescription.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Description")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.secondary)
+                                    
+                                    HTMLTextView(info.projectDescription, maxHeight: 60)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(.controlBackgroundColor))
+                                .stroke(Color(.separatorColor), lineWidth: 1)
+                        )
+                        
+                        // Path info
+                        HStack {
+                            Image(systemName: "folder")
+                                .foregroundColor(.secondary)
+                            
+                            Text(info.path)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        
+                        Spacer()
+                        
+                        // Action buttons
+                        HStack(spacing: 16) {
+                            Button("Choose Different Folder") {
+                                showingFileImporter = true
+                            }
+                            .buttonStyle(.bordered)
+                            
+                            Spacer()
+                            
+                            Button("Create Project") {
+                                createProject()
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+                    .padding()
+                } else {
+                    // Initial state - choose folder
+                    VStack(spacing: 24) {
+                        Image(systemName: "folder.badge.gearshape")
+                            .font(.system(size: 64))
+                            .foregroundColor(.accentColor)
+                        
+                        Text("Create Project from Repository")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        Text("Choose a Git repository folder to automatically detect project information and create a new project.")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
+                        
+                        Button("Choose Repository Folder") {
                             showingFileImporter = true
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                
+                if let error = errorMessage {
+                    Text(error)
+                        .foregroundColor(.red)
+                        .font(.caption)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.red.opacity(0.1))
+                        )
                 }
             }
-            .formStyle(.grouped)
             .navigationTitle("New Project")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
                 }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        createProject()
-                    }
-                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
             }
         }
-        .frame(width: 500, height: 400)
+        .frame(width: 600, height: 500)
         .fileImporter(
             isPresented: $showingFileImporter,
             allowedContentTypes: [.folder],
@@ -859,18 +1032,50 @@ struct CreateProjectView: View {
             case .success(let urls):
                 if let url = urls.first {
                     rootPath = url.path
+                    detectRepository()
                 }
             case .failure:
-                break
+                errorMessage = "Failed to select folder"
+            }
+        }
+    }
+    
+    private func detectRepository() {
+        guard !rootPath.isEmpty else { return }
+        
+        isDetecting = true
+        errorMessage = nil
+        detectedInfo = nil
+        
+        Task {
+            do {
+                let info = try await GitService.shared.detectRepository(at: rootPath)
+                await MainActor.run {
+                    isDetecting = false
+                    detectedInfo = info
+                }
+            } catch {
+                await MainActor.run {
+                    isDetecting = false
+                    errorMessage = "Failed to detect repository: \(error.localizedDescription)"
+                }
             }
         }
     }
     
     private func createProject() {
+        guard let info = detectedInfo else { return }
+        
         let project = Project(
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            projectDescription: description.trimmingCharacters(in: .whitespacesAndNewlines),
-            rootPath: rootPath.isEmpty ? nil : rootPath
+            name: info.displayName,
+            projectDescription: info.projectDescription,
+            rootPath: info.path,
+            currentBranch: info.currentBranch,
+            remoteOrigin: info.remoteOrigin,
+            lastCommitHash: info.lastCommit.hash,
+            lastCommitAuthor: info.lastCommit.author,
+            lastCommitMessage: info.lastCommit.message,
+            lastCommitDate: info.lastCommit.formattedDate
         )
         
         modelContext.insert(project)
@@ -879,8 +1084,30 @@ struct CreateProjectView: View {
             try modelContext.save()
             dismiss()
         } catch {
-            // TODO: Show error alert
-            print("Failed to create project: \(error)")
+            errorMessage = "Failed to create project: \(error.localizedDescription)"
+        }
+    }
+}
+
+// MARK: - Project Info Row Component
+struct ProjectInfoRow: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack(alignment: .top) {
+            Text(label)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+                .frame(width: 100, alignment: .leading)
+            
+            Text(value)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+                .lineLimit(3)
+            
+            Spacer()
         }
     }
 }

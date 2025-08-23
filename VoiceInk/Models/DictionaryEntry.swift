@@ -1,7 +1,7 @@
 import Foundation
 import SwiftData
 
-enum EntryType: String, Codable, CaseIterable {
+public enum EntryType: String, Codable, CaseIterable {
     case term = "term"
     case file = "file"
     case directory = "directory"
@@ -55,24 +55,24 @@ enum EntryType: String, Codable, CaseIterable {
 }
 
 @Model
-final class DictionaryEntry {
-    @Attribute(.unique) var id: UUID
-    var term: String
-    var definition: String?
-    var aliases: [String] // Alternative names or synonyms
-    var entryType: EntryType
-    var frequency: Int // How often this term appears in source
-    var importance: Double // Calculated importance score (0.0 - 1.0)
-    var sourceFile: String? // File path where term was found
-    var lineNumber: Int? // Line number in source file
-    var context: String? // Surrounding text context
-    var tags: [String] // Metadata tags for categorization
-    var createdAt: Date
-    var updatedAt: Date
+public final class DictionaryEntry {
+    @Attribute(.unique) public var id: UUID
+    public var term: String
+    public var definition: String?
+    public var aliases: [String] // Alternative names or synonyms
+    public var entryType: EntryType
+    public var frequency: Int // How often this term appears in source
+    public var importance: Double // Calculated importance score (0.0 - 1.0)
+    public var sourceFile: String? // File path where term was found
+    public var lineNumber: Int? // Line number in source file
+    public var context: String? // Surrounding text context
+    public var tags: [String] // Metadata tags for categorization
+    public var createdAt: Date
+    public var updatedAt: Date
     
-    @Relationship var pack: ContextPack?
+    @Relationship public var pack: ContextPack?
     
-    init(
+    public init(
         id: UUID = UUID(),
         term: String,
         definition: String? = nil,
@@ -102,23 +102,23 @@ final class DictionaryEntry {
         self.updatedAt = Date()
     }
     
-    func updateTimestamp() {
+    public func updateTimestamp() {
         updatedAt = Date()
     }
     
-    func incrementFrequency() {
+    public func incrementFrequency() {
         frequency += 1
         updateTimestamp()
     }
     
-    func addAlias(_ alias: String) {
+    public func addAlias(_ alias: String) {
         if !aliases.contains(alias) {
             aliases.append(alias)
             updateTimestamp()
         }
     }
     
-    func addTag(_ tag: String) {
+    public func addTag(_ tag: String) {
         if !tags.contains(tag) {
             tags.append(tag)
             updateTimestamp()
